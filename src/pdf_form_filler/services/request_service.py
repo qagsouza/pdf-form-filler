@@ -214,6 +214,168 @@ class RequestService:
             raise PDFFormFillerError(f"Failed to create and process request: {e}")
 
     @staticmethod
+    def create_batch_request(
+        db: Session,
+        user_id: str,
+        template_id: str,
+        batch_data: List[Dict[str, Any]],
+        storage: StorageService,
+        name: Optional[str] = None,
+        notes: Optional[str] = None,
+        email_service: Optional[EmailService] = None,
+    ) -> Request:
+        """
+        Create a batch request with multiple instances
+
+        Args:
+            db: Database session
+            user_id: User ID
+            template_id: Template ID to use
+            batch_data: List of dictionaries with form data for each instance
+            storage: Storage service
+            name: Optional request name
+            notes: Optional notes
+            email_service: Email service instance (optional)
+
+        Returns:
+            Created batch request with all instances
+
+        Raises:
+            PDFFormFillerError: If creation or processing fails
+        """
+        # Verify template exists and user has access
+        template = TemplateService.get_template(db, template_id, user_id)
+        if not template:
+            raise PDFFormFillerError("Template not found or access denied")
+
+        if not batch_data:
+            raise PDFFormFillerError("No batch data provided")
+
+        try:
+            # Create request
+            request = Request(
+                id=str(uuid.uuid4()),
+                template_id=template_id,
+                requester_id=user_id,
+                type=RequestType.BATCH,
+                status=RequestStatus.PROCESSING,
+                name=name,
+                notes=notes
+            )
+
+            db.add(request)
+            db.flush()  # Get request ID
+
+            # Create instances for each data row
+            instances = []
+            for idx, data_row in enumerate(batch_data):
+                instance = RequestInstance(
+                    id=str(uuid.uuid4()),
+                    request_id=request.id,
+                    data=data_row,
+                    recipient_email=data_row.get("_recipient_email"),  # Special field
+                    recipient_name=data_row.get("_recipient_name"),    # Special field
+                    status=InstanceStatus.PENDING
+                )
+
+                # Remove special fields from data
+                if "_recipient_email" in instance.data:
+                    del instance.data["_recipient_email"]
+                if "_recipient_name" in instance.data:
+                    del instance.data["_recipient_name"]
+
+                db.add(instance)
+                instances.append(instance)
+
+            db.flush()
+
+            # Process each instance
+            completed_count = 0
+            failed_count = 0
+
+            for instance in instances:
+                try:
+                    instance.status = InstanceStatus.PROCESSING
+                    db.flush()
+
+                    RequestService._process_instance(
+                        db=db,
+                        instance=instance,
+                        template=template,
+                        storage=storage
+                    )
+
+                    instance.status = InstanceStatus.COMPLETED
+                    instance.processed_at = datetime.utcnow()
+                    completed_count += 1
+
+                    # Send email if configured
+                    if email_service and instance.recipient_email:
+                        import asyncio
+                        try:
+                            requester = db.query(User).filter(User.id == user_id).first()
+                            requester_name = requester.full_name if requester else None
+
+                            loop = asyncio.get_event_loop()
+                            if loop.is_running():
+                                asyncio.create_task(
+                                    email_service.send_pdf_notification(
+                                        to_email=instance.recipient_email,
+                                        to_name=instance.recipient_name or instance.recipient_email,
+                                        template_name=template.name,
+                                        pdf_path=storage.get_filled_pdf_path(instance.filled_pdf_path),
+                                        request_name=name,
+                                        notes=notes,
+                                        requester_name=requester_name
+                                    )
+                                )
+                            else:
+                                loop.run_until_complete(
+                                    email_service.send_pdf_notification(
+                                        to_email=instance.recipient_email,
+                                        to_name=instance.recipient_name or instance.recipient_email,
+                                        template_name=template.name,
+                                        pdf_path=storage.get_filled_pdf_path(instance.filled_pdf_path),
+                                        request_name=name,
+                                        notes=notes,
+                                        requester_name=requester_name
+                                    )
+                                )
+
+                            instance.email_sent = datetime.utcnow()
+                            instance.status = InstanceStatus.SENT
+
+                        except Exception as e:
+                            print(f"Failed to send email for instance {instance.id}: {e}")
+
+                except Exception as e:
+                    instance.status = InstanceStatus.FAILED
+                    instance.error_message = str(e)
+                    failed_count += 1
+                    print(f"Failed to process instance {instance.id}: {e}")
+
+                db.flush()
+
+            # Update request status
+            if failed_count == 0:
+                request.status = RequestStatus.COMPLETED
+            elif completed_count == 0:
+                request.status = RequestStatus.FAILED
+            else:
+                request.status = RequestStatus.COMPLETED  # Partial success is still completed
+
+            request.completed_at = datetime.utcnow()
+
+            db.commit()
+            db.refresh(request)
+
+            return request
+
+        except Exception as e:
+            db.rollback()
+            raise PDFFormFillerError(f"Failed to create and process batch request: {e}")
+
+    @staticmethod
     def _process_instance(
         db: Session,
         instance: RequestInstance,

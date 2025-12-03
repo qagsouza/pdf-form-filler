@@ -14,6 +14,7 @@ from ...schemas.request import RequestWithData
 from ...services.request_service import RequestService
 from ...services.storage_service import StorageService
 from ...services.template_service import TemplateService
+from ...services.excel_service import ExcelService, ExcelError
 from ...errors import PDFFormFillerError
 
 router = APIRouter(tags=["web-requests"])
@@ -290,3 +291,140 @@ async def download_filled_pdf(
 
     except PDFFormFillerError as e:
         raise HTTPException(status_code=404, detail=str(e))
+
+
+@router.get("/batch/{template_id}", response_class=HTMLResponse)
+def batch_upload_page(
+    template_id: str,
+    http_request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Show batch upload page for a template"""
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=302)
+
+    # Get template
+    template = TemplateService.get_template(db, template_id, current_user.id)
+
+    if not template:
+        return RedirectResponse(url="/templates?error=not_found", status_code=302)
+
+    # Get fields
+    try:
+        fields = TemplateService.get_template_fields(template, storage_service)
+    except PDFFormFillerError:
+        fields = {}
+
+    return templates.TemplateResponse(
+        http_request,
+        "requests/batch.html",
+        {
+            "template": template,
+            "fields": fields,
+            "current_user": current_user
+        }
+    )
+
+
+@router.post("/batch/{template_id}")
+async def submit_batch_upload(
+    template_id: str,
+    http_request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Process batch upload"""
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=302)
+
+    try:
+        # Parse form data
+        form = await http_request.form()
+
+        # Get optional fields
+        batch_name = form.get("batch_name", "").strip() or None
+        batch_notes = form.get("batch_notes", "").strip() or None
+
+        # Get uploaded file
+        excel_file = form.get("excel_file")
+
+        if not excel_file or not hasattr(excel_file, 'file'):
+            return RedirectResponse(
+                url=f"/batch/{template_id}?error=upload_failed",
+                status_code=302
+            )
+
+        # Save uploaded file temporarily
+        temp_path = storage_service.create_temp_file(".xlsx")
+
+        try:
+            with open(temp_path, 'wb') as f:
+                content = await excel_file.read()
+                f.write(content)
+
+            # Parse Excel file
+            batch_data = ExcelService.parse_batch_file(str(temp_path))
+
+            if not batch_data:
+                return RedirectResponse(
+                    url=f"/batch/{template_id}?error=no_data",
+                    status_code=302
+                )
+
+            # Initialize email service if needed
+            email_service = None
+            has_emails = any('_recipient_email' in row for row in batch_data)
+
+            if has_emails:
+                from ...services.email_service import EmailService
+                try:
+                    email_service = EmailService()
+                except Exception:
+                    pass
+
+            # Create batch request
+            req = RequestService.create_batch_request(
+                db=db,
+                user_id=current_user.id,
+                template_id=template_id,
+                batch_data=batch_data,
+                storage=storage_service,
+                name=batch_name,
+                notes=batch_notes,
+                email_service=email_service
+            )
+
+            return RedirectResponse(
+                url=f"/requests/{req.id}?success=batch_created",
+                status_code=302
+            )
+
+        finally:
+            # Clean up temp file
+            import os
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+
+    except ExcelError as e:
+        print(f"Excel error: {e}")
+        return RedirectResponse(
+            url=f"/batch/{template_id}?error=upload_failed",
+            status_code=302
+        )
+    except PDFFormFillerError as e:
+        print(f"PDFFormFillerError: {e}")
+        import traceback
+        traceback.print_exc()
+        return RedirectResponse(
+            url=f"/batch/{template_id}?error=processing_failed",
+            status_code=302
+        )
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        import traceback
+        traceback.print_exc()
+        return RedirectResponse(
+            url=f"/batch/{template_id}?error=processing_failed",
+            status_code=302
+        )

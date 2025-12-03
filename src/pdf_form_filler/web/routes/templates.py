@@ -12,6 +12,7 @@ from ...models.user import User
 from ...schemas.template import TemplateCreate, TemplateUpdate, TemplateShareCreate
 from ...services.template_service import TemplateService
 from ...services.storage_service import StorageService
+from ...services.excel_service import ExcelService
 from ...errors import PDFFormFillerError
 
 router = APIRouter(tags=["web-templates"])
@@ -349,3 +350,49 @@ async def remove_share(
             url=f"/templates/{template_id}?error=remove_failed",
             status_code=302
         )
+
+
+@router.get("/templates/{template_id}/download-excel")
+def download_excel_template(
+    template_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Download Excel template with form field names"""
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=302)
+
+    template = TemplateService.get_template(db, template_id, current_user.id)
+
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    try:
+        storage = StorageService()
+
+        # Get template fields
+        fields = TemplateService.get_template_fields(template, storage)
+
+        # Get field names
+        field_names = list(fields.keys())
+
+        # Add special columns for email
+        field_names.append("_recipient_email")
+        field_names.append("_recipient_name")
+
+        # Create Excel template
+        temp_path = storage.create_temp_file(".xlsx")
+        ExcelService.create_template(field_names, str(temp_path))
+
+        # Generate filename
+        safe_name = template.name.replace(" ", "_").replace("/", "_")
+        filename = f"{safe_name}_batch_template.xlsx"
+
+        return FileResponse(
+            temp_path,
+            filename=filename,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+
+    except PDFFormFillerError as e:
+        raise HTTPException(status_code=500, detail=str(e))

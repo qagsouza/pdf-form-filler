@@ -20,6 +20,13 @@
             </div>
             {% endif %}
 
+            {% if request.query_params.get('success') == 'batch_created' %}
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle"></i> Lote processado com sucesso! {{ req.instances|length }} PDF(s) gerado(s).
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
             <div class="row">
                 <div class="col-md-8">
                     <!-- Request info -->
