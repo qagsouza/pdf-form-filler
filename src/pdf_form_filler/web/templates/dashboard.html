@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard - PDF Form Filler{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">Dashboard</h1>
+            <p class="lead">Bem-vindo, {{ current_user.full_name }}!</p>
+        </div>
+    </div>
+
+    {% if not current_user.is_verified %}
+    <div class="row">
+        <div class="col-12">
+            <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                <h5 class="alert-heading">
+                    <i class="bi bi-exclamation-triangle"></i> Email Não Verificado
+                </h5>
+                <p>
+                    Por favor, verifique seu email para ter acesso completo ao sistema.
+                    Enviamos um link de verificação para <strong>{{ current_user.email }}</strong>.
+                </p>
+                <hr>
+                <form method="POST" action="/resend-verification" class="d-inline">
+                    <button type="submit" class="btn btn-sm btn-warning">
+                        <i class="bi bi-envelope"></i> Reenviar Email de Verificação
+                    </button>
+                </form>
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    {% if request.query_params.get('message') == 'verification_sent' %}
+    <div class="row">
+        <div class="col-12">
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle"></i> Email de verificação enviado! Verifique sua caixa de entrada.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <div class="row g-4 mt-2">
+        {% if current_user.is_admin() %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm border-danger">
+                <div class="card-body">
+                    <h5 class="card-title text-danger">
+                        <i class="bi bi-shield-lock"></i>
+                        Administração
+                    </h5>
+                    <p class="card-text">
+                        Gerencie usuários e configurações do sistema.
+                    </p>
+                    <a href="/admin/users" class="btn btn-danger">
+                        Painel Admin
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-file-earmark-pdf"></i>
+                        Templates
+                    </h5>
+                    <p class="card-text">
+                        Gerencie seus templates de PDF para preenchimento.
+                    </p>
+                    <a href="/templates" class="btn btn-primary">
+                        Acessar Templates
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-pencil-square"></i>
+                        Preencher PDF
+                    </h5>
+                    <p class="card-text">
+                        Preencha um formulário PDF individualmente.
+                    </p>
+                    <a href="/fill" class="btn btn-primary">
+                        Preencher Agora
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-files"></i>
+                        Lote de PDFs
+                    </h5>
+                    <p class="card-text">
+                        Preencha múltiplos formulários de uma vez.
+                    </p>
+                    <a href="/batch" class="btn btn-primary">
+                        Preenchimento em Lote
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-clock-history"></i>
+                        Histórico
+                    </h5>
+                    <p class="card-text">
+                        Veja suas requisições anteriores.
+                    </p>
+                    <a href="/history" class="btn btn-secondary">
+                        Ver Histórico
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="bi bi-person-circle"></i>
+                        Perfil
+                    </h5>
+                    <p class="card-text">
+                        Gerencie suas informações pessoais.
+                    </p>
+                    <a href="/profile" class="btn btn-secondary">
+                        Ver Perfil
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+{% endblock %}

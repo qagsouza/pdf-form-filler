@@ -1,0 +1,209 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pdf-form-filler"
+version = "0.3.0"
+description = "Preenchimento automático de formulários PDF com suporte a CLI e API web"
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+authors = [
+    {name = "Seu Nome", email = "seu-email@exemplo.com"}
+]
+keywords = ["pdf", "forms", "acroform", "fill", "automation"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Office/Business",
+]
+
+dependencies = [
+    "pdfrw>=0.4",
+    "pypdf>=3.0.0",
+    "reportlab>=3.6.0",
+    "click>=8.0.0",
+    "sqlalchemy>=2.0.0",
+    "alembic>=1.12.0",
+    "bcrypt>=3.2.0,<4.0.0",
+    "passlib>=1.7.4",
+    "python-jose[cryptography]>=3.3.0",
+    "python-multipart>=0.0.6",
+    "itsdangerous>=2.1.0",
+    "pydantic>=2.0.0",
+    "pydantic-settings>=2.0.0",
+    "aiosmtplib>=2.0.0",
+    "email-validator>=2.0.0",
+]
+
+[project.optional-dependencies]
+web = [
+    "fastapi>=0.100.0",
+    "uvicorn[standard]>=0.23.0",
+    "jinja2>=3.1.0",
+    "python-multipart>=0.0.6",
+    "aiofiles>=23.0.0",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "pytest-asyncio>=0.21.0",
+    "httpx>=0.24.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+    "types-aiofiles>=23.0.0",
+]
+all = [
+    "pdf-form-filler[web,dev]",
+]
+
+[project.urls]
+Homepage = "https://github.com/seu-usuario/pdf-form-filler"
+Documentation = "https://github.com/seu-usuario/pdf-form-filler#readme"
+Repository = "https://github.com/seu-usuario/pdf-form-filler"
+Issues = "https://github.com/seu-usuario/pdf-form-filler/issues"
+Changelog = "https://github.com/seu-usuario/pdf-form-filler/blob/master/CHANGELOG.md"
+
+[project.scripts]
+pdf-form-filler = "pdf_form_filler.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["pdf_form_filler*"]
+exclude = ["tests*"]
+
+[tool.setuptools.package-data]
+pdf_form_filler = ["py.typed"]
+
+# Configuração do Black (formatador de código)
+[tool.black]
+line-length = 100
+target-version = ["py38", "py39", "py310", "py311", "py312"]
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | venv
+  | build
+  | dist
+)/
+'''
+
+# Configuração do Ruff (linter rápido)
+[tool.ruff]
+line-length = 100
+target-version = "py38"
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+    "ARG", # flake8-unused-arguments
+    "SIM", # flake8-simplify
+]
+ignore = [
+    "E501",  # line too long (handled by black)
+    "B008",  # do not perform function calls in argument defaults
+    "B905",  # zip without explicit strict parameter
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]  # unused imports
+"tests/**/*.py" = ["ARG"]  # unused function arguments in tests
+
+# Configuração do MyPy (type checker)
+[tool.mypy]
+python_version = "3.8"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = true
+disallow_untyped_decorators = false
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+follow_imports = "normal"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "pdfrw.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "reportlab.*"
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "pypdf.*"
+ignore_missing_imports = true
+
+# Configuração do Pytest
+[tool.pytest.ini_options]
+minversion = "7.0"
+testpaths = ["tests"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "--cov=src/pdf_form_filler",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=xml",
+]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "unit: marks tests as unit tests",
+]
+
+# Configuração de Coverage
+[tool.coverage.run]
+source = ["src/pdf_form_filler"]
+omit = [
+    "*/tests/*",
+    "*/test_*.py",
+    "*/__pycache__/*",
+    "*/venv/*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "@abstractmethod",
+]
+precision = 2
+show_missing = true

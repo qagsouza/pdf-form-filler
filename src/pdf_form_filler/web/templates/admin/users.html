@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+
+{% block title %}Gerenciar Usuários - Admin{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>Gerenciar Usuários</h1>
+                <div>
+                    <button type="button" class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#createUserModal">
+                        <i class="bi bi-person-plus"></i> Novo Usuário
+                    </button>
+                    <a href="/dashboard" class="btn btn-secondary">Voltar ao Dashboard</a>
+                </div>
+            </div>
+
+            {% if request.query_params.get('success') == 'user_created' %}
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle"></i> Usuário criado com sucesso!
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Nome</th>
+                                    <th>Usuário</th>
+                                    <th>Email</th>
+                                    <th>Email Verificado</th>
+                                    <th>Role</th>
+                                    <th>Status</th>
+                                    <th>Criado em</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in users %}
+                                <tr>
+                                    <td>{{ user.full_name }}</td>
+                                    <td><code>{{ user.username }}</code></td>
+                                    <td>{{ user.email }}</td>
+                                    <td class="text-center">
+                                        {% if user.is_verified %}
+                                            <span class="badge bg-success">
+                                                <i class="bi bi-check-circle-fill"></i> Verificado
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-warning text-dark">
+                                                <i class="bi bi-exclamation-triangle-fill"></i> Não Verificado
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if user.is_admin() %}
+                                            <span class="badge bg-danger">Admin</span>
+                                        {% else %}
+                                            <span class="badge bg-info">User</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if user.is_approved %}
+                                            <span class="badge bg-success">Aprovado</span>
+                                        {% else %}
+                                            <span class="badge bg-warning">Pendente</span>
+                                        {% endif %}
+
+                                        {% if user.is_active %}
+                                            <span class="badge bg-success">Ativo</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Inativo</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ user.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                                    <td>
+                                        {% if user.id != current_user.id %}
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <!-- Approve/Revoke -->
+                                            {% if not user.is_approved %}
+                                                {% if user.is_verified %}
+                                                <form method="POST" action="/admin/users/{{ user.id }}/approve" class="d-inline">
+                                                    <button type="submit" class="btn btn-success" title="Aprovar">
+                                                        <i class="bi bi-check-circle"></i>
+                                                    </button>
+                                                </form>
+                                                {% else %}
+                                                <button type="button" class="btn btn-secondary" disabled
+                                                        title="Email não verificado. O usuário precisa verificar o email antes de ser aprovado."
+                                                        data-bs-toggle="tooltip">
+                                                    <i class="bi bi-check-circle"></i>
+                                                </button>
+                                                {% endif %}
+                                            {% else %}
+                                            <form method="POST" action="/admin/users/{{ user.id }}/revoke" class="d-inline">
+                                                <button type="submit" class="btn btn-warning" title="Revogar aprovação">
+                                                    <i class="bi bi-x-circle"></i>
+                                                </button>
+                                            </form>
+                                            {% endif %}
+
+                                            <!-- Toggle Admin -->
+                                            <form method="POST" action="/admin/users/{{ user.id }}/toggle-admin" class="d-inline">
+                                                {% if user.is_admin() %}
+                                                <button type="submit" class="btn btn-secondary" title="Remover admin">
+                                                    <i class="bi bi-person-dash"></i>
+                                                </button>
+                                                {% else %}
+                                                <button type="submit" class="btn btn-primary" title="Tornar admin">
+                                                    <i class="bi bi-person-plus"></i>
+                                                </button>
+                                                {% endif %}
+                                            </form>
+
+                                            <!-- Delete -->
+                                            <form method="POST" action="/admin/users/{{ user.id }}/delete" class="d-inline"
+                                                  onsubmit="return confirm('Tem certeza que deseja excluir este usuário?')">
+                                                <button type="submit" class="btn btn-danger" title="Excluir">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                        {% else %}
+                                            <span class="text-muted">Você</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {% if not users %}
+                    <div class="alert alert-info text-center">
+                        Nenhum usuário cadastrado.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <div class="card">
+                    <div class="card-body">
+                        <h5 class="card-title">Legenda</h5>
+                        <ul class="list-unstyled">
+                            <li><i class="bi bi-check-circle text-success"></i> Aprovar usuário</li>
+                            <li><i class="bi bi-x-circle text-warning"></i> Revogar aprovação</li>
+                            <li><i class="bi bi-person-plus text-primary"></i> Tornar administrador</li>
+                            <li><i class="bi bi-person-dash text-secondary"></i> Remover privilégios de admin</li>
+                            <li><i class="bi bi-trash text-danger"></i> Excluir usuário</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Criar Usuário -->
+<div class="modal fade" id="createUserModal" tabindex="-1" aria-labelledby="createUserModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="/admin/users/create">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createUserModalLabel">Criar Novo Usuário</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    {% if request.query_params.get('error') == 'email_exists' %}
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        Este email já está em uso.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                    {% endif %}
+
+                    {% if request.query_params.get('error') == 'username_exists' %}
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        Este nome de usuário já está em uso.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                    {% endif %}
+
+                    <div class="mb-3">
+                        <label for="full_name" class="form-label">Nome Completo</label>
+                        <input type="text" class="form-control" id="full_name" name="full_name" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="admin_username" class="form-label">Usuário</label>
+                        <input type="text" class="form-control" id="admin_username" name="username" required pattern="[a-zA-Z0-9_]+">
+                        <div class="form-text">Apenas letras, números e underscore</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="email" class="form-label">Email</label>
+                        <input type="email" class="form-control" id="email" name="email" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Senha</label>
+                        <input type="password" class="form-control" id="password" name="password" required minlength="8">
+                        <div class="form-text">Mínimo 8 caracteres</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="role" class="form-label">Tipo de Conta</label>
+                        <select class="form-select" id="role" name="role" required>
+                            <option value="user" selected>Usuário</option>
+                            <option value="admin">Administrador</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3 form-check">
+                        <input type="checkbox" class="form-check-input" id="is_approved" name="is_approved" value="true" checked>
+                        <label class="form-check-label" for="is_approved">
+                            Aprovar automaticamente
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Criar Usuário</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+{% endblock %}
+
+{% block extra_scripts %}
+{% if request.query_params.get('error') == 'email_exists' %}
+<script>
+    // Reabrir modal se houver erro
+    var myModal = new bootstrap.Modal(document.getElementById('createUserModal'));
+    myModal.show();
+</script>
+{% endif %}
+{% endblock %}

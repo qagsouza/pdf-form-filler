@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Login - PDF Form Filler{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <div class="card shadow-sm mt-5">
+                <div class="card-body p-4">
+                    <h2 class="card-title text-center mb-4">Login</h2>
+
+                    {% if request.query_params.get('error') == 'invalid' %}
+                    <div class="alert alert-danger" role="alert">
+                        Usuário ou senha inválidos. Tente novamente.
+                    </div>
+                    {% endif %}
+
+                    <form method="POST" action="/login">
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Usuário</label>
+                            <input
+                                type="text"
+                                class="form-control"
+                                id="username"
+                                name="username"
+                                required
+                                autofocus
+                                placeholder="seu_usuario"
+                            >
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Senha</label>
+                            <input
+                                type="password"
+                                class="form-control"
+                                id="password"
+                                name="password"
+                                required
+                            >
+                        </div>
+
+                        <div class="d-grid gap-2 mb-3">
+                            <button type="submit" class="btn btn-primary">
+                                Entrar
+                            </button>
+                        </div>
+
+                        <div class="text-center">
+                            <p class="mb-0">
+                                Não tem uma conta?
+                                <a href="/register" class="text-decoration-none">Registrar-se</a>
+                            </p>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

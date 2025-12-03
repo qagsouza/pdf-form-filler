@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Perfil - PDF Form Filler{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-8 col-lg-6">
+            <h1 class="mb-4">Meu Perfil</h1>
+
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+                    <div class="mb-4">
+                        <h5 class="text-muted mb-3">Informações Pessoais</h5>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Nome Completo</label>
+                            <p class="form-control-plaintext">{{ current_user.full_name }}</p>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Email</label>
+                            <p class="form-control-plaintext">{{ current_user.email }}</p>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Status da Conta</label>
+                            <p class="form-control-plaintext">
+                                {% if current_user.is_active %}
+                                    <span class="badge bg-success">Ativa</span>
+                                {% else %}
+                                    <span class="badge bg-danger">Inativa</span>
+                                {% endif %}
+
+                                {% if current_user.is_verified %}
+                                    <span class="badge bg-info">Verificada</span>
+                                {% else %}
+                                    <span class="badge bg-warning">Não Verificada</span>
+                                {% endif %}
+                            </p>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label fw-bold">Membro desde</label>
+                            <p class="form-control-plaintext">
+                                {{ current_user.created_at.strftime('%d/%m/%Y') }}
+                            </p>
+                        </div>
+                    </div>
+
+                    <hr>
+
+                    <div class="d-grid gap-2">
+                        <a href="/dashboard" class="btn btn-secondary">
+                            Voltar ao Dashboard
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

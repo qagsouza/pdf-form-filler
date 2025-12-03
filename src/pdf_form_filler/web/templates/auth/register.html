@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+
+{% block title %}Registrar - PDF Form Filler{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row justify-content-center">
+        <div class="col-md-6 col-lg-5">
+            <div class="card shadow-sm mt-5">
+                <div class="card-body p-4">
+                    <h2 class="card-title text-center mb-4">Criar Conta</h2>
+
+                    {% if request.query_params.get('error') == 'email_exists' %}
+                    <div class="alert alert-danger" role="alert">
+                        Este email já está em uso. Tente fazer login ou use outro email.
+                    </div>
+                    {% endif %}
+
+                    {% if request.query_params.get('error') == 'username_exists' %}
+                    <div class="alert alert-danger" role="alert">
+                        Este nome de usuário já está em uso. Escolha outro.
+                    </div>
+                    {% endif %}
+
+                    <form method="POST" action="/register">
+                        <div class="mb-3">
+                            <label for="full_name" class="form-label">Nome Completo</label>
+                            <input
+                                type="text"
+                                class="form-control"
+                                id="full_name"
+                                name="full_name"
+                                required
+                                autofocus
+                            >
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Usuário</label>
+                            <input
+                                type="text"
+                                class="form-control"
+                                id="username"
+                                name="username"
+                                required
+                                pattern="[a-zA-Z0-9_]+"
+                                placeholder="seu_usuario"
+                            >
+                            <div class="form-text">
+                                Apenas letras, números e underscore. Será usado para login.
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email</label>
+                            <input
+                                type="email"
+                                class="form-control"
+                                id="email"
+                                name="email"
+                                required
+                            >
+                            <div class="form-text">
+                                Será enviado um link de verificação para este email.
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="password" class="form-label">Senha</label>
+                            <input
+                                type="password"
+                                class="form-control"
+                                id="password"
+                                name="password"
+                                required
+                                minlength="8"
+                            >
+                            <div class="form-text">
+                                A senha deve ter no mínimo 8 caracteres.
+                            </div>
+                        </div>
+
+                        <div class="d-grid gap-2 mb-3">
+                            <button type="submit" class="btn btn-primary">
+                                Criar Conta
+                            </button>
+                        </div>
+
+                        <div class="text-center">
+                            <p class="mb-0">
+                                Já tem uma conta?
+                                <a href="/login" class="text-decoration-none">Fazer login</a>
+                            </p>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

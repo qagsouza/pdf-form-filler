@@ -1,0 +1,45 @@
+<!-- This fragment is returned via HTMX after upload -->
+<div class="card p-4">
+  <h5 class="mb-3">
+    <span class="badge bg-success">✓</span> Formulário detectado
+  </h5>
+  <p class="text-muted mb-3">Preencha os campos abaixo e clique em "Gerar PDF"</p>
+
+  <form id="fill-form" method="post" action="/fill">
+    <input type="hidden" name="pdf_name" value="{{ pdf_name }}">
+
+    {% if fields %}
+      {% for name, meta in fields.items() %}
+        <div class="mb-3">
+          <label class="form-label">
+            <strong>{{ name }}</strong>
+            <small class="badge bg-secondary">{{ meta.type }}</small>
+          </label>
+
+          {% if meta.type == 'text' or meta.type == 'unknown' %}
+            <input class="form-control" type="text" name="{{ name }}" value="{{ meta.value }}" placeholder="Digite o valor...">
+          {% elif meta.type == 'button' %}
+            <div class="form-check">
+              <input class="form-check-input" type="checkbox" name="{{ name }}" id="{{ name }}_id" value="Yes">
+              <label class="form-check-label" for="{{ name }}_id">Marcar este campo</label>
+            </div>
+          {% elif meta.type == 'choice' %}
+            <input class="form-control" type="text" name="{{ name }}" value="{{ meta.value }}" placeholder="Selecione uma opção...">
+          {% else %}
+            <input class="form-control" type="text" name="{{ name }}" value="{{ meta.value }}">
+          {% endif %}
+        </div>
+      {% endfor %}
+
+      <hr>
+      <button class="btn btn-success btn-lg" type="button" id="fill-btn">
+        <span id="fill-btn-text">Gerar PDF Preenchido</span>
+        <span id="fill-spinner" class="spinner-border spinner-border-sm ms-2 d-none" role="status"></span>
+      </button>
+    {% else %}
+      <div class="alert alert-warning">
+        <strong>Aviso:</strong> Nenhum campo foi detectado neste PDF. O arquivo pode não conter formulários AcroForm.
+      </div>
+    {% endif %}
+  </form>
+</div>
