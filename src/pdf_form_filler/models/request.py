@@ -100,9 +100,10 @@ class RequestInstance(Base):
     # Form data (JSON with field values)
     data = Column(JSON, nullable=False)
 
-    # Optional recipient info (for future email feature)
+    # Optional recipient info (for email feature)
     recipient_email = Column(String, nullable=True)
     recipient_name = Column(String, nullable=True)
+    email_sent = Column(DateTime, nullable=True)  # Timestamp when email was sent
 
     # Status
     status = Column(SQLEnum(InstanceStatus), nullable=False, default=InstanceStatus.PENDING)

@@ -30,6 +30,7 @@ class RequestWithData(BaseModel):
     data: Dict[str, Any] = Field(..., description="Form field data")
     recipient_email: Optional[str] = Field(None, description="Optional recipient email")
     recipient_name: Optional[str] = Field(None, max_length=255, description="Optional recipient name")
+    send_email: bool = Field(False, description="Send email notification when complete")
 
 
 # Response Schemas
@@ -41,6 +42,7 @@ class RequestInstanceResponse(BaseModel):
     data: Dict[str, Any]
     recipient_email: Optional[str]
     recipient_name: Optional[str]
+    email_sent: Optional[datetime]
     status: str
     filled_pdf_path: Optional[str]
     error_message: Optional[str]

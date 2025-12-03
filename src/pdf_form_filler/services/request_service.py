@@ -21,6 +21,7 @@ from ..core import PDFFormFiller
 from ..errors import PDFFormFillerError
 from .storage_service import StorageService
 from .template_service import TemplateService
+from .email_service import EmailService
 
 
 class RequestService:
@@ -86,7 +87,9 @@ class RequestService:
         db: Session,
         user_id: str,
         request_data: RequestWithData,
-        storage: StorageService
+        storage: StorageService,
+        email_service: Optional[EmailService] = None,
+        send_email: bool = False
     ) -> Request:
         """
         Create a request and fill it immediately
@@ -96,6 +99,8 @@ class RequestService:
             user_id: User ID
             request_data: Request with form data
             storage: Storage service
+            email_service: Email service instance (optional)
+            send_email: Whether to send email notification
 
         Returns:
             Created and processed request
@@ -147,6 +152,50 @@ class RequestService:
 
                 request.status = RequestStatus.COMPLETED
                 request.completed_at = datetime.utcnow()
+
+                # Send email notification if requested
+                if send_email and email_service and instance.recipient_email:
+                    import asyncio
+                    try:
+                        # Get user info for requester name
+                        requester = db.query(User).filter(User.id == user_id).first()
+                        requester_name = requester.full_name if requester else None
+
+                        # Send email (async)
+                        loop = asyncio.get_event_loop()
+                        if loop.is_running():
+                            # If event loop is running, schedule the coroutine
+                            asyncio.create_task(
+                                email_service.send_pdf_notification(
+                                    to_email=instance.recipient_email,
+                                    to_name=instance.recipient_name or instance.recipient_email,
+                                    template_name=template.name,
+                                    pdf_path=storage.get_filled_pdf_path(instance.filled_pdf_path),
+                                    request_name=request.name,
+                                    notes=request.notes,
+                                    requester_name=requester_name
+                                )
+                            )
+                        else:
+                            # If no event loop, run sync
+                            loop.run_until_complete(
+                                email_service.send_pdf_notification(
+                                    to_email=instance.recipient_email,
+                                    to_name=instance.recipient_name or instance.recipient_email,
+                                    template_name=template.name,
+                                    pdf_path=storage.get_filled_pdf_path(instance.filled_pdf_path),
+                                    request_name=request.name,
+                                    notes=request.notes,
+                                    requester_name=requester_name
+                                )
+                            )
+
+                        instance.email_sent = datetime.utcnow()
+                        instance.status = InstanceStatus.SENT
+
+                    except Exception as e:
+                        # Log error but don't fail the request
+                        print(f"Failed to send email: {e}")
 
             except Exception as e:
                 # Mark as failed but don't raise

@@ -2,7 +2,7 @@
 PDF Form Filler - Automatically fill PDF forms with Python
 """
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 from .core import PDFFormFiller, fill_pdf
 from .errors import PDFFormFillerError

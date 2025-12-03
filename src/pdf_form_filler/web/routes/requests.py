@@ -142,7 +142,7 @@ async def submit_fill_form(
         data = {}
 
         for key, val in form.multi_items():
-            if key in ["template_id", "request_name", "request_notes"]:
+            if key in ["template_id", "request_name", "request_notes", "send_email", "recipient_email", "recipient_name"]:
                 continue
 
             # Handle checkboxes (HTML sends 'on' when checked)
@@ -159,19 +159,39 @@ async def submit_fill_form(
         request_name = form.get("request_name", "").strip() or None
         request_notes = form.get("request_notes", "").strip() or None
 
+        # Get email fields
+        send_email = form.get("send_email") == "on"
+        recipient_email = form.get("recipient_email", "").strip() or None
+        recipient_name = form.get("recipient_name", "").strip() or None
+
         # Create request
         request_data = RequestWithData(
             template_id=template_id,
             name=request_name,
             notes=request_notes,
-            data=data
+            data=data,
+            recipient_email=recipient_email,
+            recipient_name=recipient_name,
+            send_email=send_email
         )
+
+        # Initialize email service if needed
+        email_service = None
+        if send_email:
+            from ...services.email_service import EmailService
+            try:
+                email_service = EmailService()
+            except Exception:
+                # Email not configured, continue without it
+                pass
 
         req = RequestService.create_request_with_instance(
             db=db,
             user_id=current_user.id,
             request_data=request_data,
-            storage=storage_service
+            storage=storage_service,
+            email_service=email_service,
+            send_email=send_email
         )
 
         return RedirectResponse(
@@ -180,6 +200,17 @@ async def submit_fill_form(
         )
 
     except PDFFormFillerError as e:
+        print(f"PDFFormFillerError: {e}")
+        import traceback
+        traceback.print_exc()
+        return RedirectResponse(
+            url=f"/fill/{template_id}?error=processing_failed",
+            status_code=302
+        )
+    except Exception as e:
+        print(f"Unexpected error: {e}")
+        import traceback
+        traceback.print_exc()
         return RedirectResponse(
             url=f"/fill/{template_id}?error=processing_failed",
             status_code=302

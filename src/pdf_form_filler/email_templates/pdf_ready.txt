@@ -1,0 +1,22 @@
+PDF Preenchido - PDF Form Filler
+
+Olá {{ recipient_name }},
+
+Seu PDF foi preenchido e está pronto!
+
+Template: {{ template_name }}
+{% if request_name %}Requisição: {{ request_name }}{% endif %}
+{% if requester_name %}Preenchido por: {{ requester_name }}{% endif %}
+Arquivo: {{ pdf_filename }}
+
+{% if notes %}
+Observações:
+{{ notes }}
+{% endif %}
+
+O PDF está anexado a este email.
+
+Obrigado por usar o PDF Form Filler!
+
+---
+PDF Form Filler - Sistema de Gerenciamento de Formulários

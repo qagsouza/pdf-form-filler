@@ -94,6 +94,18 @@
                                             <p class="mb-1 text-muted small">
                                                 Criado: {{ instance.created_at.strftime('%d/%m/%Y %H:%M') }}
                                             </p>
+                                            {% if instance.recipient_email %}
+                                            <p class="mb-1 text-info small">
+                                                <i class="bi bi-envelope"></i> Email: {{ instance.recipient_email }}
+                                                {% if instance.email_sent %}
+                                                <span class="badge bg-success">Enviado em {{ instance.email_sent.strftime('%d/%m/%Y %H:%M') }}</span>
+                                                {% elif instance.status.value == 'sent' %}
+                                                <span class="badge bg-success">Enviado</span>
+                                                {% else %}
+                                                <span class="badge bg-warning">Pendente</span>
+                                                {% endif %}
+                                            </p>
+                                            {% endif %}
                                             {% if instance.error_message %}
                                             <p class="mb-1 text-danger small">
                                                 Erro: {{ instance.error_message }}

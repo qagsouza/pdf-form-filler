@@ -48,6 +48,34 @@
                     </div>
                 </div>
 
+                <!-- Email notification -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Notificação por Email (Opcional)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="form-check mb-3">
+                            <input type="checkbox" class="form-check-input" id="send_email" name="send_email"
+                                   onchange="document.getElementById('emailFields').style.display = this.checked ? 'block' : 'none'">
+                            <label class="form-check-label" for="send_email">
+                                Enviar PDF por email quando completado
+                            </label>
+                        </div>
+                        <div id="emailFields" style="display: none;">
+                            <div class="mb-3">
+                                <label for="recipient_email" class="form-label">Email do Destinatário *</label>
+                                <input type="email" class="form-control" id="recipient_email" name="recipient_email"
+                                       placeholder="destinatario@exemplo.com">
+                            </div>
+                            <div class="mb-3">
+                                <label for="recipient_name" class="form-label">Nome do Destinatário</label>
+                                <input type="text" class="form-control" id="recipient_name" name="recipient_name"
+                                       placeholder="Nome completo">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- Form fields -->
                 <div class="card shadow-sm mb-4">
                     <div class="card-header">
