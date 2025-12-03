@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+
+{% block title %}Minhas Requisições{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>Minhas Requisições</h1>
+                <a href="/templates" class="btn btn-primary">
+                    <i class="bi bi-plus-circle"></i> Nova Requisição
+                </a>
+            </div>
+
+            {% if request.query_params.get('success') == 'created' %}
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle"></i> Requisição criada com sucesso!
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            {% if request.query_params.get('success') == 'deleted' %}
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle"></i> Requisição excluída com sucesso!
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            <!-- Stats -->
+            <div class="row g-3 mb-4">
+                <div class="col-md-3">
+                    <div class="card bg-primary text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">Total</h5>
+                            <h2>{{ stats.total_requests }}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-success text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">Completadas</h5>
+                            <h2>{{ stats.completed_requests }}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-warning text-dark">
+                        <div class="card-body">
+                            <h5 class="card-title">Pendentes</h5>
+                            <h2>{{ stats.pending_requests }}</h2>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card bg-danger text-white">
+                        <div class="card-body">
+                            <h5 class="card-title">Falhadas</h5>
+                            <h2>{{ stats.failed_requests }}</h2>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Requests list -->
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h5 class="mb-0">Requisições ({{ requests|length }})</h5>
+                </div>
+                <div class="card-body">
+                    {% if requests %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Nome/Template</th>
+                                    <th>Preenchido por</th>
+                                    <th>Status</th>
+                                    <th>Criado em</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in requests %}
+                                <tr>
+                                    <td>
+                                        <strong>{{ item.request.name or item.template_name }}</strong><br>
+                                        <small class="text-muted">Template: {{ item.template_name }}</small>
+                                    </td>
+                                    <td>
+                                        <small>{{ item.request.requester.full_name }}</small>
+                                    </td>
+                                    <td>
+                                        {% if item.request.status.value == 'completed' %}
+                                            <span class="badge bg-success">Completo</span>
+                                        {% elif item.request.status.value == 'failed' %}
+                                            <span class="badge bg-danger">Falhou</span>
+                                        {% elif item.request.status.value == 'processing' %}
+                                            <span class="badge bg-warning">Processando</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">Pendente</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ item.request.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm">
+                                            <a href="/requests/{{ item.request.id }}" class="btn btn-primary">
+                                                <i class="bi bi-eye"></i>
+                                            </a>
+                                            <form method="POST" action="/requests/{{ item.request.id }}/delete"
+                                                  onsubmit="return confirm('Tem certeza?')" class="d-inline">
+                                                <button type="submit" class="btn btn-danger">
+                                                    <i class="bi bi-trash"></i>
+                                                </button>
+                                            </form>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info text-center">
+                        <i class="bi bi-info-circle"></i> Você ainda não tem requisições. Selecione um template para começar.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+{% endblock %}

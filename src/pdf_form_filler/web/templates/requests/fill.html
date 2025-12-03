@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+
+{% block title %}Preencher {{ template.name }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>Preencher Formulário</h1>
+                <a href="/templates/{{ template.id }}" class="btn btn-secondary">Voltar</a>
+            </div>
+
+            {% if request.query_params.get('error') == 'processing_failed' %}
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle"></i> Falha ao processar o formulário. Verifique os dados e tente novamente.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-file-earmark-pdf"></i> {{ template.name }}</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-muted">{{ template.description or 'Preencha os campos abaixo' }}</p>
+                    <p><strong>Campos detectados:</strong> {{ fields|length }}</p>
+                </div>
+            </div>
+
+            <form method="POST" action="/fill/{{ template.id }}">
+                <!-- Optional metadata -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Informações da Requisição (Opcional)</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="request_name" class="form-label">Nome da Requisição</label>
+                            <input type="text" class="form-control" id="request_name" name="request_name"
+                                   placeholder="Ex: Formulário de admissão - João Silva">
+                        </div>
+                        <div class="mb-3">
+                            <label for="request_notes" class="form-label">Observações</label>
+                            <textarea class="form-control" id="request_notes" name="request_notes" rows="2"
+                                      placeholder="Observações sobre este preenchimento"></textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Form fields -->
+                <div class="card shadow-sm mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Dados do Formulário</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if fields %}
+                        <div class="row g-3">
+                            {% for field_name, field_info in fields.items() %}
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="field_{{ loop.index }}" class="form-label">
+                                        {{ field_name }}
+                                        <span class="badge bg-secondary ms-2">{{ field_info.type }}</span>
+                                    </label>
+
+                                    {% if field_info.type == 'button' %}
+                                        <!-- Checkbox -->
+                                        <div class="form-check">
+                                            <input type="checkbox" class="form-check-input"
+                                                   id="field_{{ loop.index }}"
+                                                   name="{{ field_name }}"
+                                                   value="on">
+                                            <label class="form-check-label" for="field_{{ loop.index }}">
+                                                Marcar
+                                            </label>
+                                        </div>
+                                    {% elif field_info.type == 'choice' %}
+                                        <!-- Dropdown -->
+                                        <input type="text" class="form-control"
+                                               id="field_{{ loop.index }}"
+                                               name="{{ field_name }}"
+                                               placeholder="Digite o valor">
+                                    {% else %}
+                                        <!-- Text field -->
+                                        <input type="text" class="form-control"
+                                               id="field_{{ loop.index }}"
+                                               name="{{ field_name }}"
+                                               placeholder="Digite o valor">
+                                    {% endif %}
+
+                                    <div class="form-text">Página: {{ field_info.page + 1 }}</div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="alert alert-warning">
+                            Nenhum campo detectado neste PDF.
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                    <a href="/templates/{{ template.id }}" class="btn btn-secondary me-md-2">
+                        Cancelar
+                    </a>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-check-circle"></i> Preencher e Gerar PDF
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+{% endblock %}
