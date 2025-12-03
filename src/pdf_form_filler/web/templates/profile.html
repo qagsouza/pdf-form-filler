@@ -1,63 +1,185 @@
 {% extends "base.html" %}
 
-{% block title %}Perfil - PDF Form Filler{% endblock %}
+{% block title %}Meu Perfil{% endblock %}
 
 {% block content %}
 <div class="container">
-    <div class="row justify-content-center">
-        <div class="col-md-8 col-lg-6">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
             <h1 class="mb-4">Meu Perfil</h1>
 
+            {% if request.query_params.get('success') == 'profile_updated' %}
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle"></i> Perfil atualizado com sucesso!
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            {% if request.query_params.get('success') == 'email_changed' %}
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle"></i> Email alterado! Um novo link de verificação foi enviado.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            {% if request.query_params.get('success') == 'password_changed' %}
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle"></i> Senha alterada com sucesso!
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            {% if request.query_params.get('error') == 'update_failed' %}
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle"></i> Falha ao atualizar perfil.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            {% if request.query_params.get('error') == 'email_in_use' %}
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle"></i> Este email já está em uso.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            {% if request.query_params.get('error') == 'wrong_password' %}
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle"></i> Senha atual incorreta.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            <!-- Profile Information -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Informações do Perfil</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="/profile/update">
+                        <div class="mb-3">
+                            <label for="full_name" class="form-label">Nome Completo</label>
+                            <input type="text" class="form-control" id="full_name" name="full_name"
+                                   value="{{ current_user.full_name }}" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="email" name="email"
+                                   value="{{ current_user.email }}" required>
+                            {% if not current_user.is_verified %}
+                            <div class="form-text text-warning">
+                                <i class="bi bi-exclamation-triangle"></i> Email não verificado
+                            </div>
+                            {% endif %}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Nome de Usuário</label>
+                            <input type="text" class="form-control" id="username" name="username"
+                                   value="{{ current_user.username }}" disabled>
+                            <div class="form-text">Nome de usuário não pode ser alterado</div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Salvar Alterações
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Change Password -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Alterar Senha</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="/profile/change-password">
+                        <div class="mb-3">
+                            <label for="current_password" class="form-label">Senha Atual</label>
+                            <input type="password" class="form-control" id="current_password" 
+                                   name="current_password" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="new_password" class="form-label">Nova Senha</label>
+                            <input type="password" class="form-control" id="new_password" 
+                                   name="new_password" required minlength="6">
+                            <div class="form-text">Mínimo de 6 caracteres</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="confirm_password" class="form-label">Confirmar Nova Senha</label>
+                            <input type="password" class="form-control" id="confirm_password" 
+                                   name="confirm_password" required minlength="6">
+                        </div>
+
+                        <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-key"></i> Alterar Senha
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Account Information -->
             <div class="card shadow-sm">
-                <div class="card-body p-4">
-                    <div class="mb-4">
-                        <h5 class="text-muted mb-3">Informações Pessoais</h5>
-
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Nome Completo</label>
-                            <p class="form-control-plaintext">{{ current_user.full_name }}</p>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Email</label>
-                            <p class="form-control-plaintext">{{ current_user.email }}</p>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Status da Conta</label>
-                            <p class="form-control-plaintext">
-                                {% if current_user.is_active %}
-                                    <span class="badge bg-success">Ativa</span>
-                                {% else %}
-                                    <span class="badge bg-danger">Inativa</span>
-                                {% endif %}
-
-                                {% if current_user.is_verified %}
-                                    <span class="badge bg-info">Verificada</span>
-                                {% else %}
-                                    <span class="badge bg-warning">Não Verificada</span>
-                                {% endif %}
-                            </p>
-                        </div>
-
-                        <div class="mb-3">
-                            <label class="form-label fw-bold">Membro desde</label>
-                            <p class="form-control-plaintext">
-                                {{ current_user.created_at.strftime('%d/%m/%Y') }}
-                            </p>
-                        </div>
-                    </div>
-
-                    <hr>
-
-                    <div class="d-grid gap-2">
-                        <a href="/dashboard" class="btn btn-secondary">
-                            Voltar ao Dashboard
-                        </a>
-                    </div>
+                <div class="card-header">
+                    <h5 class="mb-0">Informações da Conta</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>Tipo de Conta:</strong> 
+                        {% if current_user.role == 'admin' %}
+                            <span class="badge bg-danger">Administrador</span>
+                        {% else %}
+                            <span class="badge bg-primary">Usuário</span>
+                        {% endif %}
+                    </p>
+                    <p><strong>Status:</strong> 
+                        {% if current_user.is_active %}
+                            <span class="badge bg-success">Ativa</span>
+                        {% else %}
+                            <span class="badge bg-secondary">Inativa</span>
+                        {% endif %}
+                    </p>
+                    <p><strong>Email Verificado:</strong> 
+                        {% if current_user.is_verified %}
+                            <span class="badge bg-success">Sim</span>
+                        {% else %}
+                            <span class="badge bg-warning">Não</span>
+                        {% endif %}
+                    </p>
+                    <p><strong>Conta Aprovada:</strong> 
+                        {% if current_user.is_approved %}
+                            <span class="badge bg-success">Sim</span>
+                        {% else %}
+                            <span class="badge bg-warning">Aguardando Aprovação</span>
+                        {% endif %}
+                    </p>
+                    <p class="mb-0"><strong>Membro desde:</strong> {{ current_user.created_at.strftime('%d/%m/%Y') }}</p>
                 </div>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+<script>
+    // Validate password confirmation
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.querySelector('form[action="/profile/change-password"]');
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                const newPassword = document.getElementById('new_password').value;
+                const confirmPassword = document.getElementById('confirm_password').value;
+                
+                if (newPassword !== confirmPassword) {
+                    e.preventDefault();
+                    alert('As senhas não coincidem!');
+                }
+            });
+        }
+    });
+</script>
 {% endblock %}

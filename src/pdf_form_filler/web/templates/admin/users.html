@@ -116,13 +116,10 @@
                                                 {% endif %}
                                             </form>
 
-                                            <!-- Delete -->
-                                            <form method="POST" action="/admin/users/{{ user.id }}/delete" class="d-inline"
-                                                  onsubmit="return confirm('Tem certeza que deseja excluir este usuário?')">
-                                                <button type="submit" class="btn btn-danger" title="Excluir">
-                                                    <i class="bi bi-trash"></i>
-                                                </button>
-                                            </form>
+                                            <!-- Edit -->
+                                            <a href="/admin/users/{{ user.id }}/edit" class="btn btn-info btn-sm" title="Editar">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
                                         </div>
                                         {% else %}
                                             <span class="text-muted">Você</span>
@@ -151,7 +148,7 @@
                             <li><i class="bi bi-x-circle text-warning"></i> Revogar aprovação</li>
                             <li><i class="bi bi-person-plus text-primary"></i> Tornar administrador</li>
                             <li><i class="bi bi-person-dash text-secondary"></i> Remover privilégios de admin</li>
-                            <li><i class="bi bi-trash text-danger"></i> Excluir usuário</li>
+                            <li><i class="bi bi-pencil text-info"></i> Editar usuário (inclui opção de exclusão)</li>
                         </ul>
                     </div>
                 </div>
@@ -207,11 +204,27 @@
                     </div>
 
                     <div class="mb-3">
-                        <label for="role" class="form-label">Tipo de Conta</label>
-                        <select class="form-select" id="role" name="role" required>
-                            <option value="user" selected>Usuário</option>
-                            <option value="admin">Administrador</option>
-                        </select>
+                        <label class="form-label">Roles (RBAC)</label>
+                        {% if all_roles %}
+                        {% for role in all_roles %}
+                        <div class="form-check">
+                            <input class="form-check-input" type="checkbox"
+                                   id="create_role_{{ role.id }}" name="roles" value="{{ role.id }}"
+                                   {% if role.name == 'viewer' %}checked{% endif %}>
+                            <label class="form-check-label" for="create_role_{{ role.id }}">
+                                <strong>{{ role.name }}</strong>
+                                {% if role.description %}
+                                <br><small class="text-muted">{{ role.description }}</small>
+                                {% endif %}
+                            </label>
+                        </div>
+                        {% endfor %}
+                        <div class="form-text">Selecione pelo menos um role. O role "viewer" é selecionado por padrão.</div>
+                        {% else %}
+                        <div class="alert alert-warning mb-0">
+                            Nenhum role disponível. Execute as migrações do banco de dados.
+                        </div>
+                        {% endif %}
                     </div>
 
                     <div class="mb-3 form-check">

@@ -18,7 +18,7 @@ from ..errors import PDFFormFillerError
 from ..database import init_db
 from ..api import auth as api_auth, templates as api_templates, requests as api_requests
 from .routes import auth, dashboard, admin, requests as requests_routes
-from .routes import templates as templates_routes
+from .routes import templates as templates_routes, profile
 
 
 # Configuration
@@ -67,6 +67,7 @@ def create_app() -> FastAPI:
     app.include_router(admin.router)
     app.include_router(templates_routes.router)
     app.include_router(requests_routes.router)
+    app.include_router(profile.router)
 
     # Mount static files if directory exists
     if STATIC_DIR.exists():

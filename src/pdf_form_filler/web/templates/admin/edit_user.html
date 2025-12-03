@@ -1,0 +1,237 @@
+{% extends "base.html" %}
+
+{% block title %}Editar Usuário - {{ user.username }}{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-md-8 offset-md-2">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>Editar Usuário</h1>
+                <a href="/admin/users" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Voltar
+                </a>
+            </div>
+
+            {% if request.query_params.get('success') == 'updated' %}
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle"></i> Usuário atualizado com sucesso!
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            {% if request.query_params.get('error') == 'email_in_use' %}
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle"></i> Este email já está em uso por outro usuário.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            {% if request.query_params.get('error') == 'username_in_use' %}
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle"></i> Este nome de usuário já está em uso.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            <!-- User Information -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Informações do Usuário</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="/admin/users/{{ user.id }}/update">
+                        <div class="mb-3">
+                            <label for="username" class="form-label">Nome de Usuário</label>
+                            <input type="text" class="form-control" id="username" name="username"
+                                   value="{{ user.username }}" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="full_name" class="form-label">Nome Completo</label>
+                            <input type="text" class="form-control" id="full_name" name="full_name"
+                                   value="{{ user.full_name }}" required>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="email" class="form-label">Email</label>
+                            <input type="email" class="form-control" id="email" name="email"
+                                   value="{{ user.email }}" required>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <i class="bi bi-info-circle"></i> <strong>Nota:</strong> O tipo de conta agora é gerenciado através de <strong>Roles (RBAC)</strong>. Use a seção "Gerenciar Roles" abaixo para atribuir permissões.
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="is_active" name="is_active"
+                                       {% if user.is_active %}checked{% endif %}>
+                                <label class="form-check-label" for="is_active">
+                                    Conta Ativa
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="is_verified" name="is_verified"
+                                       {% if user.is_verified %}checked{% endif %}>
+                                <label class="form-check-label" for="is_verified">
+                                    Email Verificado
+                                </label>
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="is_approved" name="is_approved"
+                                       {% if user.is_approved %}checked{% endif %}>
+                                <label class="form-check-label" for="is_approved">
+                                    Conta Aprovada
+                                </label>
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary">
+                            <i class="bi bi-save"></i> Salvar Alterações
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Manage Roles (RBAC) -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-info text-white">
+                    <h5 class="mb-0">Gerenciar Roles (RBAC)</h5>
+                </div>
+                <div class="card-body">
+                    {% if request.query_params.get('success') == 'roles_updated' %}
+                    <div class="alert alert-success alert-dismissible fade show" role="alert">
+                        <i class="bi bi-check-circle"></i> Roles atualizados com sucesso!
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                    {% endif %}
+
+                    {% if request.query_params.get('error') == 'roles_update_failed' %}
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        <i class="bi bi-exclamation-triangle"></i> Falha ao atualizar roles.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                    {% endif %}
+
+                    <p class="text-muted mb-3">
+                        Roles permitem controle granular de permissões. Um usuário pode ter múltiplos roles.
+                    </p>
+
+                    <form method="POST" action="/admin/users/{{ user.id }}/update-roles">
+                        {% if all_roles %}
+                        <div class="mb-3">
+                            <label class="form-label">Selecione os Roles:</label>
+                            {% for role in all_roles %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox"
+                                       id="role_{{ role.id }}" name="roles" value="{{ role.id }}"
+                                       {% if role.id in user_role_ids %}checked{% endif %}>
+                                <label class="form-check-label" for="role_{{ role.id }}">
+                                    <strong>{{ role.name }}</strong>
+                                    {% if role.description %}
+                                    <br><small class="text-muted">{{ role.description }}</small>
+                                    {% endif %}
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <button type="submit" class="btn btn-info">
+                            <i class="bi bi-shield-check"></i> Atualizar Roles
+                        </button>
+                        {% else %}
+                        <div class="alert alert-warning">
+                            Nenhum role disponível. Execute as migrações do banco de dados para criar os roles padrão.
+                        </div>
+                        {% endif %}
+                    </form>
+                </div>
+            </div>
+
+            <!-- Reset Password -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-warning">
+                    <h5 class="mb-0">Redefinir Senha</h5>
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="/admin/users/{{ user.id }}/reset-password">
+                        <div class="mb-3">
+                            <label for="new_password" class="form-label">Nova Senha</label>
+                            <input type="password" class="form-control" id="new_password" 
+                                   name="new_password" required minlength="6">
+                            <div class="form-text">Mínimo de 6 caracteres</div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="confirm_password" class="form-label">Confirmar Nova Senha</label>
+                            <input type="password" class="form-control" id="confirm_password" 
+                                   name="confirm_password" required minlength="6">
+                        </div>
+
+                        <button type="submit" class="btn btn-warning">
+                            <i class="bi bi-key"></i> Redefinir Senha
+                        </button>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Account Information -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Informações da Conta</h5>
+                </div>
+                <div class="card-body">
+                    <p><strong>ID:</strong> <code>{{ user.id }}</code></p>
+                    <p><strong>Criado em:</strong> {{ user.created_at.strftime('%d/%m/%Y %H:%M') }}</p>
+                    <p class="mb-0"><strong>Última atualização:</strong> {{ user.updated_at.strftime('%d/%m/%Y %H:%M') }}</p>
+                </div>
+            </div>
+
+            <!-- Danger Zone -->
+            <div class="card shadow-sm border-danger">
+                <div class="card-header bg-danger text-white">
+                    <h5 class="mb-0">Zona de Perigo</h5>
+                </div>
+                <div class="card-body">
+                    <p class="text-danger">
+                        <strong>Atenção:</strong> Esta ação não pode ser desfeita. Todos os templates e dados do usuário serão permanentemente removidos.
+                    </p>
+                    <form method="POST" action="/admin/users/{{ user.id }}/delete"
+                          onsubmit="return confirm('Tem certeza que deseja excluir este usuário? Esta ação não pode ser desfeita!')">
+                        <button type="submit" class="btn btn-danger">
+                            <i class="bi bi-trash"></i> Excluir Usuário
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+<script>
+    // Validate password confirmation
+    document.addEventListener('DOMContentLoaded', function() {
+        const form = document.querySelector('form[action*="/reset-password"]');
+        if (form) {
+            form.addEventListener('submit', function(e) {
+                const newPassword = document.getElementById('new_password').value;
+                const confirmPassword = document.getElementById('confirm_password').value;
+                
+                if (newPassword !== confirmPassword) {
+                    e.preventDefault();
+                    alert('As senhas não coincidem!');
+                }
+            });
+        }
+    });
+</script>
+{% endblock %}

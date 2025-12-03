@@ -7,8 +7,9 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from ...database import get_db
-from ...dependencies import require_admin
+from ...dependencies import require_admin, get_current_user
 from ...models.user import User
+from ...models.permission import Role, user_roles
 from ...services.auth_service import AuthService
 from ...schemas.user import UserCreate
 from ...utils.auth import get_password_hash, generate_user_id
@@ -28,20 +29,23 @@ def list_users(
     """List all users for admin"""
     users = db.query(User).order_by(User.created_at.desc()).all()
 
+    # Get all available roles for the create user form
+    all_roles = db.query(Role).order_by(Role.name).all()
+
     return templates.TemplateResponse(
         request,
         "admin/users.html",
-        {"current_user": current_user, "users": users}
+        {"current_user": current_user, "users": users, "all_roles": all_roles}
     )
 
 
 @router.post("/users/create")
 async def create_user(
+    request: Request,
     full_name: str = Form(...),
     username: str = Form(...),
     email: str = Form(...),
     password: str = Form(...),
-    role: str = Form(...),
     is_approved: str = Form(None),
     current_user: User = Depends(require_admin),
     db: Session = Depends(get_db)
@@ -64,13 +68,29 @@ async def create_user(
         email=email,
         full_name=full_name,
         hashed_password=get_password_hash(password),
-        role=role,
+        role="user",  # Default legacy value, actual permissions via RBAC
         is_active=True,
         is_verified=True,  # Admin-created users are verified by default
         is_approved=is_approved == "true",  # Checkbox value
     )
 
     db.add(user)
+    db.flush()  # Flush to get user ID before adding roles
+
+    # Get selected roles from form
+    form = await request.form()
+    selected_role_ids = form.getlist("roles")
+
+    # Assign roles
+    if selected_role_ids:
+        for role_id in selected_role_ids:
+            db.execute(user_roles.insert().values(user_id=user.id, role_id=role_id))
+    else:
+        # If no roles selected, assign viewer role by default
+        viewer_role = db.query(Role).filter(Role.name == "viewer").first()
+        if viewer_role:
+            db.execute(user_roles.insert().values(user_id=user.id, role_id=viewer_role.id))
+
     db.commit()
 
     return RedirectResponse(url="/admin/users?success=user_created", status_code=302)
@@ -134,3 +154,191 @@ async def delete_user(
         db.commit()
 
     return RedirectResponse(url="/admin/users", status_code=302)
+
+
+@router.get("/users/{user_id}/edit", response_class=HTMLResponse)
+def edit_user_page(
+    user_id: str,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Show edit user page"""
+    if not current_user or not current_user.is_admin():
+        return RedirectResponse(url="/dashboard", status_code=302)
+
+    user = db.query(User).filter(User.id == user_id).first()
+
+    if not user:
+        return RedirectResponse(url="/admin/users?error=user_not_found", status_code=302)
+
+    # Get all available roles
+    all_roles = db.query(Role).order_by(Role.name).all()
+
+    # Get user's current roles
+    user_role_ids = db.query(user_roles.c.role_id).filter(user_roles.c.user_id == user_id).all()
+    user_role_ids = [r[0] for r in user_role_ids]
+
+    return templates.TemplateResponse(
+        request,
+        "admin/edit_user.html",
+        {
+            "current_user": current_user,
+            "user": user,
+            "all_roles": all_roles,
+            "user_role_ids": user_role_ids
+        }
+    )
+
+
+@router.post("/users/{user_id}/update")
+async def update_user(
+    user_id: str,
+    username: str = Form(...),
+    full_name: str = Form(...),
+    email: str = Form(...),
+    is_active: bool = Form(False),
+    is_verified: bool = Form(False),
+    is_approved: bool = Form(False),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update user information"""
+    if not current_user or not current_user.is_admin():
+        return RedirectResponse(url="/dashboard", status_code=302)
+
+    user = db.query(User).filter(User.id == user_id).first()
+    
+    if not user:
+        return RedirectResponse(url="/admin/users?error=user_not_found", status_code=302)
+
+    try:
+        # Check if username changed and is in use
+        if username != user.username:
+            existing = AuthService.get_user_by_username(db, username)
+            if existing and existing.id != user.id:
+                return RedirectResponse(
+                    url=f"/admin/users/{user_id}/edit?error=username_in_use",
+                    status_code=302
+                )
+
+        # Check if email changed and is in use
+        if email.lower() != user.email.lower():
+            existing = AuthService.get_user_by_email(db, email)
+            if existing and existing.id != user.id:
+                return RedirectResponse(
+                    url=f"/admin/users/{user_id}/edit?error=email_in_use",
+                    status_code=302
+                )
+
+        # Update user
+        user.username = username
+        user.full_name = full_name
+        user.email = email.lower()
+        # Note: role is now managed via RBAC, not this field
+        user.is_active = is_active
+        user.is_verified = is_verified
+        user.is_approved = is_approved
+
+        db.commit()
+
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/edit?success=updated",
+            status_code=302
+        )
+
+    except Exception as e:
+        db.rollback()
+        print(f"Error updating user: {e}")
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/edit?error=update_failed",
+            status_code=302
+        )
+
+
+@router.post("/users/{user_id}/reset-password")
+async def reset_user_password(
+    user_id: str,
+    new_password: str = Form(...),
+    confirm_password: str = Form(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Reset user password"""
+    if not current_user or not current_user.is_admin():
+        return RedirectResponse(url="/dashboard", status_code=302)
+
+    user = db.query(User).filter(User.id == user_id).first()
+    
+    if not user:
+        return RedirectResponse(url="/admin/users?error=user_not_found", status_code=302)
+
+    try:
+        # Verify passwords match
+        if new_password != confirm_password:
+            return RedirectResponse(
+                url=f"/admin/users/{user_id}/edit?error=passwords_mismatch",
+                status_code=302
+            )
+
+        # Update password
+        user.hashed_password = AuthService.hash_password(new_password)
+        db.commit()
+
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/edit?success=password_reset",
+            status_code=302
+        )
+
+    except Exception as e:
+        db.rollback()
+        print(f"Error resetting password: {e}")
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/edit?error=reset_failed",
+            status_code=302
+        )
+
+
+@router.post("/users/{user_id}/update-roles")
+async def update_user_roles(
+    user_id: str,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update user roles"""
+    if not current_user or not current_user.is_admin():
+        return RedirectResponse(url="/dashboard", status_code=302)
+
+    user = db.query(User).filter(User.id == user_id).first()
+
+    if not user:
+        return RedirectResponse(url="/admin/users?error=user_not_found", status_code=302)
+
+    try:
+        # Get selected roles from form
+        form = await request.form()
+        selected_role_ids = form.getlist("roles")
+
+        # Delete existing role assignments
+        db.execute(user_roles.delete().where(user_roles.c.user_id == user_id))
+
+        # Add new role assignments
+        if selected_role_ids:
+            for role_id in selected_role_ids:
+                db.execute(user_roles.insert().values(user_id=user_id, role_id=role_id))
+
+        db.commit()
+
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/edit?success=roles_updated",
+            status_code=302
+        )
+
+    except Exception as e:
+        db.rollback()
+        print(f"Error updating roles: {e}")
+        return RedirectResponse(
+            url=f"/admin/users/{user_id}/edit?error=roles_update_failed",
+            status_code=302
+        )

@@ -89,3 +89,41 @@ def require_admin(current_user: User = Depends(require_user)) -> User:
             detail="Admin access required",
         )
     return current_user
+
+
+def require_permission(permission: str):
+    """
+    Create a dependency that requires a specific permission
+
+    Args:
+        permission: Permission name (e.g., "template.create", "user.read")
+
+    Returns:
+        Dependency function
+
+    Usage:
+        @router.get("/templates")
+        def list_templates(
+            current_user: User = Depends(require_permission("template.read"))
+        ):
+            ...
+    """
+    def permission_checker(
+        current_user: User = Depends(require_user),
+        db: Session = Depends(get_db)
+    ) -> User:
+        """Check if user has the required permission"""
+        # Admin always has all permissions
+        if current_user.is_admin():
+            return current_user
+
+        # Check permission through RBAC
+        if not current_user.has_permission(permission, db):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"Permission denied. Required: {permission}",
+            )
+
+        return current_user
+
+    return permission_checker
