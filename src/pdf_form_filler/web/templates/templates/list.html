@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block title %}Meus Templates - PDF Form Filler{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>Meus Templates</h1>
+                <div>
+                    <button type="button" class="btn btn-primary me-2" data-bs-toggle="modal" data-bs-target="#createTemplateModal">
+                        <i class="bi bi-plus-circle"></i> Novo Template
+                    </button>
+                    <a href="/dashboard" class="btn btn-secondary">Voltar ao Dashboard</a>
+                </div>
+            </div>
+
+            <!-- Success/Error Messages -->
+            {% if request.query_params.get('success') == 'template_created' %}
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle"></i> Template criado com sucesso!
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            {% if request.query_params.get('success') == 'deleted' %}
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle"></i> Template excluído com sucesso!
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            {% if request.query_params.get('error') == 'invalid_file' %}
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle"></i> Apenas arquivos PDF são permitidos.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            {% if request.query_params.get('error') == 'not_found' %}
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle"></i> Template não encontrado.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            <!-- Owned Templates -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header bg-primary text-white">
+                    <h5 class="mb-0"><i class="bi bi-folder"></i> Meus Templates ({{ owned_templates|length }})</h5>
+                </div>
+                <div class="card-body">
+                    {% if owned_templates %}
+                    <div class="row">
+                        {% for item in owned_templates %}
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h5 class="card-title">{{ item.template.name }}</h5>
+                                    <p class="card-text text-muted small">
+                                        {{ item.template.description or 'Sem descrição' }}
+                                    </p>
+                                    <div class="mb-2">
+                                        <span class="badge bg-info">{{ item.field_count }} campos</span>
+                                        <span class="badge bg-success">Owner</span>
+                                    </div>
+                                    <p class="card-text small text-muted">
+                                        Criado em: {{ item.template.created_at.strftime('%d/%m/%Y %H:%M') }}
+                                    </p>
+                                </div>
+                                <div class="card-footer bg-transparent">
+                                    <div class="btn-group w-100" role="group">
+                                        <a href="/templates/{{ item.template.id }}" class="btn btn-sm btn-primary">
+                                            <i class="bi bi-eye"></i> Ver
+                                        </a>
+                                        <a href="/templates/{{ item.template.id }}/download" class="btn btn-sm btn-secondary">
+                                            <i class="bi bi-download"></i> Download
+                                        </a>
+                                        <form method="POST" action="/templates/{{ item.template.id }}/delete"
+                                              onsubmit="return confirm('Tem certeza que deseja excluir este template?')"
+                                              class="d-inline">
+                                            <button type="submit" class="btn btn-sm btn-danger">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info text-center">
+                        <i class="bi bi-info-circle"></i> Você ainda não possui templates. Clique em "Novo Template" para começar.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Shared Templates -->
+            {% if shared_templates %}
+            <div class="card shadow-sm">
+                <div class="card-header bg-secondary text-white">
+                    <h5 class="mb-0"><i class="bi bi-share"></i> Templates Compartilhados Comigo ({{ shared_templates|length }})</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        {% for item in shared_templates %}
+                        <div class="col-md-6 col-lg-4 mb-3">
+                            <div class="card h-100">
+                                <div class="card-body">
+                                    <h5 class="card-title">{{ item.template.name }}</h5>
+                                    <p class="card-text text-muted small">
+                                        {{ item.template.description or 'Sem descrição' }}
+                                    </p>
+                                    <div class="mb-2">
+                                        <span class="badge bg-info">{{ item.field_count }} campos</span>
+                                        <span class="badge bg-warning">{{ item.permission|capitalize }}</span>
+                                    </div>
+                                    <p class="card-text small text-muted">
+                                        Criado em: {{ item.template.created_at.strftime('%d/%m/%Y %H:%M') }}
+                                    </p>
+                                </div>
+                                <div class="card-footer bg-transparent">
+                                    <div class="btn-group w-100" role="group">
+                                        <a href="/templates/{{ item.template.id }}" class="btn btn-sm btn-primary">
+                                            <i class="bi bi-eye"></i> Ver
+                                        </a>
+                                        <a href="/templates/{{ item.template.id }}/download" class="btn btn-sm btn-secondary">
+                                            <i class="bi bi-download"></i> Download
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Create Template Modal -->
+<div class="modal fade" id="createTemplateModal" tabindex="-1" aria-labelledby="createTemplateModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="/templates/create" enctype="multipart/form-data">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createTemplateModalLabel">Criar Novo Template</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="name" class="form-label">Nome do Template</label>
+                        <input type="text" class="form-control" id="name" name="name" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="description" class="form-label">Descrição (opcional)</label>
+                        <textarea class="form-control" id="description" name="description" rows="3"></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="file" class="form-label">Arquivo PDF</label>
+                        <input type="file" class="form-control" id="file" name="file" accept=".pdf" required>
+                        <div class="form-text">Apenas arquivos PDF (máximo 10MB)</div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Criar Template</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+{% endblock %}

@@ -27,6 +27,15 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
+    # Relationships
+    templates = relationship("Template", back_populates="owner", cascade="all, delete-orphan")
+    shared_templates = relationship(
+        "TemplateShare",
+        foreign_keys="TemplateShare.user_id",
+        back_populates="user",
+        cascade="all, delete-orphan"
+    )
+
     def is_admin(self) -> bool:
         """Check if user is admin"""
         return self.role == "admin"

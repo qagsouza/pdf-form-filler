@@ -73,3 +73,29 @@ Thumbs.db
 !examples/sample_form.pdf
 output/
 temp/
+uploads/
+storage/
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Ruff
+.ruff_cache/
+
+# Type checking
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Testing
+.pytest_cache/
+htmlcov/
+
+# Build artifacts
+*.egg
+*.egg-info/
+dist/
+build/
+*.whl

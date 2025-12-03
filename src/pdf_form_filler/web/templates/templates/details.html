@@ -1,0 +1,309 @@
+{% extends "base.html" %}
+
+{% block title %}{{ template.name }} - Template{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>{{ template.name }}</h1>
+                <div>
+                    <a href="/templates/{{ template.id }}/download" class="btn btn-secondary me-2">
+                        <i class="bi bi-download"></i> Download
+                    </a>
+                    <a href="/templates" class="btn btn-secondary">Voltar</a>
+                </div>
+            </div>
+
+            <!-- Success/Error Messages -->
+            {% if request.query_params.get('success') == 'updated' %}
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle"></i> Template atualizado com sucesso!
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            {% if request.query_params.get('success') == 'shared' %}
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle"></i> Template compartilhado com sucesso!
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            {% if request.query_params.get('success') == 'share_removed' %}
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle"></i> Compartilhamento removido!
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            {% if request.query_params.get('error') == 'user_not_found' %}
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle"></i> Usuário não encontrado.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            {% if request.query_params.get('error') == 'share_failed' %}
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle"></i> Falha ao compartilhar template.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            <!-- Template Info -->
+            <div class="row">
+                <div class="col-md-8">
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Informações do Template</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="mb-3">
+                                <strong>Nome:</strong> {{ template.name }}
+                            </div>
+                            <div class="mb-3">
+                                <strong>Descrição:</strong><br>
+                                {{ template.description or 'Sem descrição' }}
+                            </div>
+                            <div class="mb-3">
+                                <strong>Arquivo:</strong> {{ template.original_filename }}
+                            </div>
+                            <div class="mb-3">
+                                <strong>Permissão:</strong>
+                                {% if permission == 'owner' %}
+                                    <span class="badge bg-success">Owner</span>
+                                {% elif permission == 'admin' %}
+                                    <span class="badge bg-danger">Admin</span>
+                                {% elif permission == 'editor' %}
+                                    <span class="badge bg-warning">Editor</span>
+                                {% else %}
+                                    <span class="badge bg-info">Viewer</span>
+                                {% endif %}
+                            </div>
+                            <div class="mb-3">
+                                <strong>Campos:</strong> {{ field_count }}
+                            </div>
+                            <div class="mb-3">
+                                <strong>Versão:</strong> {{ template.version }}
+                            </div>
+                            <div class="mb-3">
+                                <strong>Criado em:</strong> {{ template.created_at.strftime('%d/%m/%Y %H:%M') }}
+                            </div>
+                            <div class="mb-3">
+                                <strong>Atualizado em:</strong> {{ template.updated_at.strftime('%d/%m/%Y %H:%M') }}
+                            </div>
+
+                            {% if is_owner or permission in ['admin', 'editor'] %}
+                            <div class="mt-4">
+                                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#editTemplateModal">
+                                    <i class="bi bi-pencil"></i> Editar
+                                </button>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-4">
+                    <!-- Quick Actions -->
+                    <div class="card shadow-sm mb-4">
+                        <div class="card-header">
+                            <h5 class="mb-0">Ações Rápidas</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="d-grid gap-2">
+                                <a href="/templates/{{ template.id }}/download" class="btn btn-secondary">
+                                    <i class="bi bi-download"></i> Download PDF
+                                </a>
+                                <button class="btn btn-primary" disabled>
+                                    <i class="bi bi-file-earmark-fill"></i> Preencher Formulário
+                                </button>
+                                {% if is_owner %}
+                                <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#shareTemplateModal">
+                                    <i class="bi bi-share"></i> Compartilhar
+                                </button>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Fields -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Campos do Formulário ({{ field_count }})</h5>
+                </div>
+                <div class="card-body">
+                    {% if fields %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Nome do Campo</th>
+                                    <th>Tipo</th>
+                                    <th>Página</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for field_name, field_info in fields.items() %}
+                                <tr>
+                                    <td><code>{{ field_name }}</code></td>
+                                    <td>
+                                        {% if field_info.type == 'text' %}
+                                            <span class="badge bg-primary">Texto</span>
+                                        {% elif field_info.type == 'button' %}
+                                            <span class="badge bg-success">Botão/Checkbox</span>
+                                        {% elif field_info.type == 'choice' %}
+                                            <span class="badge bg-info">Escolha</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ field_info.type }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ field_info.page + 1 }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        Nenhum campo detectado neste PDF.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Sharing (Only for owner/admin) -->
+            {% if shares is not none %}
+            <div class="card shadow-sm">
+                <div class="card-header">
+                    <h5 class="mb-0">Compartilhamento ({{ shares|length }})</h5>
+                </div>
+                <div class="card-body">
+                    {% if shares %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Usuário</th>
+                                    <th>Email</th>
+                                    <th>Permissão</th>
+                                    <th>Compartilhado em</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for item in shares %}
+                                <tr>
+                                    <td>{{ item.user.full_name if item.user else 'Usuário desconhecido' }}</td>
+                                    <td>{{ item.user.email if item.user else '-' }}</td>
+                                    <td>
+                                        {% if item.share.permission.value == 'admin' %}
+                                            <span class="badge bg-danger">Admin</span>
+                                        {% elif item.share.permission.value == 'editor' %}
+                                            <span class="badge bg-warning">Editor</span>
+                                        {% else %}
+                                            <span class="badge bg-info">Viewer</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ item.share.created_at.strftime('%d/%m/%Y') }}</td>
+                                    <td>
+                                        <form method="POST" action="/templates/{{ template.id }}/share/{{ item.share.id }}/remove"
+                                              onsubmit="return confirm('Tem certeza que deseja remover este compartilhamento?')"
+                                              class="d-inline">
+                                            <button type="submit" class="btn btn-sm btn-danger">
+                                                <i class="bi bi-trash"></i> Remover
+                                            </button>
+                                        </form>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        Este template não está compartilhado com ninguém.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Edit Template Modal -->
+{% if is_owner or permission in ['admin', 'editor'] %}
+<div class="modal fade" id="editTemplateModal" tabindex="-1" aria-labelledby="editTemplateModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="/templates/{{ template.id }}/update">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="editTemplateModalLabel">Editar Template</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="edit_name" class="form-label">Nome do Template</label>
+                        <input type="text" class="form-control" id="edit_name" name="name" value="{{ template.name }}" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="edit_description" class="form-label">Descrição</label>
+                        <textarea class="form-control" id="edit_description" name="description" rows="3">{{ template.description or '' }}</textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar Alterações</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Share Template Modal -->
+{% if is_owner %}
+<div class="modal fade" id="shareTemplateModal" tabindex="-1" aria-labelledby="shareTemplateModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="/templates/{{ template.id }}/share">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="shareTemplateModalLabel">Compartilhar Template</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="user_email" class="form-label">Email do Usuário</label>
+                        <input type="email" class="form-control" id="user_email" name="user_email" required>
+                        <div class="form-text">Digite o email do usuário com quem deseja compartilhar</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="permission" class="form-label">Nível de Permissão</label>
+                        <select class="form-select" id="permission" name="permission" required>
+                            <option value="viewer" selected>Viewer - Pode visualizar e usar</option>
+                            <option value="editor">Editor - Pode visualizar, usar e editar</option>
+                            <option value="admin">Admin - Pode visualizar, usar, editar e gerenciar compartilhamentos</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Compartilhar</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+{% endblock %}

@@ -16,8 +16,9 @@ from starlette.middleware.cors import CORSMiddleware
 from ..core import PDFFormFiller
 from ..errors import PDFFormFillerError
 from ..database import init_db
-from ..api import auth as api_auth
+from ..api import auth as api_auth, templates as api_templates
 from .routes import auth, dashboard, admin
+from .routes import templates as templates_routes
 
 
 # Configuration
@@ -59,9 +60,11 @@ def create_app() -> FastAPI:
 
     # Include routers
     app.include_router(api_auth.router)
+    app.include_router(api_templates.router)
     app.include_router(auth.router)
     app.include_router(dashboard.router)
     app.include_router(admin.router)
+    app.include_router(templates_routes.router)
 
     # Mount static files if directory exists
     if STATIC_DIR.exists():
