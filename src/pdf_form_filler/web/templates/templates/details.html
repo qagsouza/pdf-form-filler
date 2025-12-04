@@ -45,6 +45,14 @@
             </div>
             {% endif %}
 
+            {% if request.query_params.get('success') == 'pdf_replaced' %}
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle"></i> <strong>PDF substituído com sucesso!</strong><br>
+                O template foi atualizado para a versão {{ template.version }}. Os campos foram re-extraídos automaticamente.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
             {% if request.query_params.get('error') == 'user_not_found' %}
             <div class="alert alert-danger alert-dismissible fade show" role="alert">
                 <i class="bi bi-exclamation-triangle"></i> Usuário não encontrado.
@@ -55,6 +63,34 @@
             {% if request.query_params.get('error') == 'share_failed' %}
             <div class="alert alert-danger alert-dismissible fade show" role="alert">
                 <i class="bi bi-exclamation-triangle"></i> Falha ao compartilhar template.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            {% if request.query_params.get('error') == 'invalid_file' %}
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle"></i> Arquivo inválido. Apenas arquivos PDF são permitidos.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            {% if request.query_params.get('error') == 'file_too_large' %}
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle"></i> Arquivo muito grande. Tamanho máximo: 10MB.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            {% if request.query_params.get('error') == 'invalid_pdf' %}
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle"></i> Arquivo PDF inválido ou corrompido.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            {% if request.query_params.get('error') == 'replace_failed' %}
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle"></i> Falha ao substituir PDF. Tente novamente.
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
             {% endif %}
@@ -138,6 +174,11 @@
                                 <a href="/templates/{{ template.id }}/download" class="btn btn-secondary">
                                     <i class="bi bi-download"></i> Download PDF
                                 </a>
+                                {% if is_owner or permission in ['admin', 'editor'] %}
+                                <button type="button" class="btn btn-info" data-bs-toggle="modal" data-bs-target="#replaceTemplateModal">
+                                    <i class="bi bi-arrow-repeat"></i> Substituir PDF
+                                </button>
+                                {% endif %}
                                 {% if is_owner %}
                                 <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#shareTemplateModal">
                                     <i class="bi bi-share"></i> Compartilhar
@@ -393,6 +434,53 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="submit" class="btn btn-primary">Salvar Valores Padrão</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Replace Template PDF Modal -->
+{% if is_owner or permission in ['admin', 'editor'] %}
+<div class="modal fade" id="replaceTemplateModal" tabindex="-1" aria-labelledby="replaceTemplateModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="/templates/{{ template.id }}/replace" enctype="multipart/form-data">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="replaceTemplateModalLabel">
+                        <i class="bi bi-arrow-repeat"></i> Substituir PDF do Template
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <i class="bi bi-exclamation-triangle"></i> <strong>Atenção:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>O arquivo PDF atual será substituído pela nova versão</li>
+                            <li>Os campos do formulário serão re-extraídos automaticamente</li>
+                            <li>Valores padrão e compartilhamentos serão mantidos</li>
+                            <li>A versão do template será incrementada</li>
+                        </ul>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="pdf_file" class="form-label">Novo Arquivo PDF</label>
+                        <input type="file" class="form-control" id="pdf_file" name="file" accept=".pdf" required>
+                        <div class="form-text">Selecione o arquivo PDF atualizado (máx. 10MB)</div>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="version_notes" class="form-label">Notas da Versão (opcional)</label>
+                        <textarea class="form-control" id="version_notes" name="version_notes" rows="3"
+                                  placeholder="Descreva as mudanças nesta versão..."></textarea>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-upload"></i> Substituir PDF
+                    </button>
                 </div>
             </form>
         </div>

@@ -460,3 +460,103 @@ async def save_default_values(
             url=f"/templates/{template_id}?error=save_failed",
             status_code=302
         )
+
+
+@router.post("/templates/{template_id}/replace")
+async def replace_template_pdf(
+    template_id: str,
+    file: UploadFile = File(...),
+    version_notes: str = Form(None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Replace template PDF with new version"""
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=302)
+
+    # Check template access and permission
+    template = TemplateService.get_template(db, template_id, current_user.id)
+
+    if not template:
+        return RedirectResponse(
+            url=f"/templates?error=not_found",
+            status_code=302
+        )
+
+    # Check permission (owner, admin or editor can replace)
+    permission = template.get_permission_for_user(current_user.id)
+    if permission not in ["owner", "admin", "editor"]:
+        return RedirectResponse(
+            url=f"/templates/{template_id}?error=no_permission",
+            status_code=302
+        )
+
+    # Validate file
+    if not file.filename.lower().endswith('.pdf'):
+        return RedirectResponse(
+            url=f"/templates/{template_id}?error=invalid_file",
+            status_code=302
+        )
+
+    try:
+        # Read file content
+        content = await file.read()
+
+        # Validate file size (10MB max)
+        if len(content) > 10 * 1024 * 1024:
+            return RedirectResponse(
+                url=f"/templates/{template_id}?error=file_too_large",
+                status_code=302
+            )
+
+        # Validate PDF magic bytes
+        if not content.startswith(b"%PDF"):
+            return RedirectResponse(
+                url=f"/templates/{template_id}?error=invalid_pdf",
+                status_code=302
+            )
+
+        # Delete old file
+        try:
+            old_path = storage_service.get_template_path(template.file_path)
+            if old_path.exists():
+                old_path.unlink()
+        except Exception as e:
+            print(f"Warning: Could not delete old file: {e}")
+
+        # Save new file with same path
+        new_path = storage_service.get_template_path(template.file_path)
+        new_path.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(new_path, 'wb') as f:
+            f.write(content)
+
+        # Extract fields from new PDF
+        from ...core import PDFFormFiller
+        pdf_filler = PDFFormFiller(str(new_path))
+        new_fields = pdf_filler.fields
+
+        # Update template
+        template.fields_metadata = new_fields
+        template.version += 1
+        template.original_filename = file.filename
+
+        db.commit()
+
+        return RedirectResponse(
+            url=f"/templates/{template_id}?success=pdf_replaced",
+            status_code=302
+        )
+
+    except PDFFormFillerError as e:
+        db.rollback()
+        return RedirectResponse(
+            url=f"/templates/{template_id}?error=pdf_processing_failed",
+            status_code=302
+        )
+    except Exception as e:
+        db.rollback()
+        return RedirectResponse(
+            url=f"/templates/{template_id}?error=replace_failed",
+            status_code=302
+        )
