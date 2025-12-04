@@ -14,8 +14,23 @@
             </div>
 
             {% if request.query_params.get('success') == 'created' %}
-            <div class="alert alert-success alert-dismissible fade show" role="alert">
-                <i class="bi bi-check-circle"></i> Requisição processada com sucesso!
+            <div class="alert alert-success alert-dismissible fade show shadow-lg" role="alert">
+                <h4 class="alert-heading">
+                    <i class="bi bi-check-circle-fill"></i> PDF Gerado com Sucesso!
+                </h4>
+                <p class="mb-3">Sua requisição foi processada. O PDF preenchido está pronto para download.</p>
+                <hr>
+                {% if req.instances and req.instances[0].status.value == 'completed' %}
+                <div class="d-grid gap-2 d-md-flex">
+                    <a href="/requests/{{ req.id }}/download/{{ req.instances[0].id }}"
+                       class="btn btn-success btn-lg">
+                        <i class="bi bi-download"></i> Baixar PDF Preenchido
+                    </a>
+                    <a href="/fill/{{ req.template_id }}" class="btn btn-outline-success">
+                        <i class="bi bi-plus-circle"></i> Preencher Novo
+                    </a>
+                </div>
+                {% endif %}
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
             {% endif %}

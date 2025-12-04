@@ -106,10 +106,32 @@ class PDFFormFiller:
                     if current_value:
                         current_value = str(current_value)
 
+                    # Get field rectangle (coordinates)
+                    rect = annot.get("/Rect")
+                    rect_list = None
+                    if rect:
+                        try:
+                            # Convert to list of floats
+                            rect_list = [float(x) for x in rect]
+                        except (ValueError, TypeError):
+                            rect_list = None
+
+                    # Get options for choice fields
+                    options = []
+                    if ftype == "choice":
+                        opt = annot.get("/Opt")
+                        if opt:
+                            try:
+                                options = [str(o).strip("()") for o in opt]
+                            except (TypeError, AttributeError):
+                                options = []
+
                     fields[name] = {
                         "type": ftype,
                         "page": page_idx,
                         "value": current_value,
+                        "rect": rect_list,
+                        "options": options if options else None,
                     }
 
         except Exception:
@@ -149,11 +171,22 @@ class PDFFormFiller:
                 else:
                     ftype = "text"
 
+                # Get field rectangle (coordinates)
+                rect = annotation.get("/Rect")
+                rect_list = None
+                if rect:
+                    try:
+                        # Convert to list of floats
+                        rect_list = [float(x) for x in rect]
+                    except (ValueError, TypeError):
+                        rect_list = None
+
                 fields[field_name] = {
                     "type": ftype,
                     "page": page_num,
                     "field_type": field_type,
                     "annotation": annotation,
+                    "rect": rect_list,
                 }
 
         return fields

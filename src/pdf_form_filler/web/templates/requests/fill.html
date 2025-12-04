@@ -1,144 +1,136 @@
 {% extends "base.html" %}
 
-{% block title %}Preencher {{ template.name }}{% endblock %}
+{% block title %}Preencher: {{ template.name }}{% endblock %}
 
 {% block content %}
-<div class="container">
+<div class="container-fluid">
     <div class="row">
         <div class="col-12">
-            <div class="d-flex justify-content-between align-items-center mb-4">
-                <h1>Preencher Formulário</h1>
-                <a href="/templates/{{ template.id }}" class="btn btn-secondary">Voltar</a>
+            <div class="d-flex justify-content-between align-items-center mb-3">
+                <h2>{{ template.name }}</h2>
+                <a href="/templates/{{ template.id }}" class="btn btn-secondary">
+                    <i class="bi bi-arrow-left"></i> Voltar
+                </a>
             </div>
+        </div>
+    </div>
 
-            {% if request.query_params.get('error') == 'processing_failed' %}
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                <i class="bi bi-exclamation-triangle"></i> Falha ao processar o formulário. Verifique os dados e tente novamente.
-                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
-            </div>
-            {% endif %}
-
-            <div class="card shadow-sm mb-4">
+    <div class="row">
+        <!-- PDF Viewer -->
+        <div class="col-lg-7 mb-4">
+            <div class="card shadow-sm">
                 <div class="card-header bg-primary text-white">
-                    <h5 class="mb-0"><i class="bi bi-file-earmark-pdf"></i> {{ template.name }}</h5>
+                    <h5 class="mb-0"><i class="bi bi-file-pdf"></i> Visualização do PDF</h5>
                 </div>
-                <div class="card-body">
-                    <p class="text-muted">{{ template.description or 'Preencha os campos abaixo' }}</p>
-                    <p><strong>Campos detectados:</strong> {{ fields|length }}</p>
+                <div class="card-body p-0">
+                    <div id="pdf-container" style="height: 800px; overflow-y: auto; background-color: #525659; position: relative;">
+                        <div style="position: relative; display: inline-block;">
+                            <canvas id="pdf-canvas" style="display: block;"></canvas>
+                            <canvas id="highlight-canvas" style="position: absolute; top: 0; left: 0; pointer-events: none;"></canvas>
+                        </div>
+                    </div>
+                    <div class="p-3 border-top">
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <button id="prev-page" class="btn btn-sm btn-outline-primary">
+                                    <i class="bi bi-chevron-left"></i> Anterior
+                                </button>
+                                <span class="mx-3">
+                                    Página <span id="page-num"></span> de <span id="page-count"></span>
+                                </span>
+                                <button id="next-page" class="btn btn-sm btn-outline-primary">
+                                    Próxima <i class="bi bi-chevron-right"></i>
+                                </button>
+                            </div>
+                            <div>
+                                <button id="zoom-out" class="btn btn-sm btn-outline-secondary">
+                                    <i class="bi bi-zoom-out"></i>
+                                </button>
+                                <span class="mx-2"><span id="zoom-level">100</span>%</span>
+                                <button id="zoom-in" class="btn btn-sm btn-outline-secondary">
+                                    <i class="bi bi-zoom-in"></i>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
+        </div>
 
-            <form method="POST" action="/fill/{{ template.id }}">
-                <!-- Optional metadata -->
-                <div class="card shadow-sm mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">Informações da Requisição (Opcional)</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <label for="request_name" class="form-label">Nome da Requisição</label>
-                            <input type="text" class="form-control" id="request_name" name="request_name"
-                                   placeholder="Ex: Formulário de admissão - João Silva">
-                        </div>
-                        <div class="mb-3">
-                            <label for="request_notes" class="form-label">Observações</label>
-                            <textarea class="form-control" id="request_notes" name="request_notes" rows="2"
-                                      placeholder="Observações sobre este preenchimento"></textarea>
-                        </div>
-                    </div>
+        <!-- Form Fields -->
+        <div class="col-lg-5 mb-4">
+            <div class="card shadow-sm sticky-top" style="top: 20px; display: flex; flex-direction: column; max-height: 90vh;">
+                <div class="card-header bg-success text-white">
+                    <h5 class="mb-0">
+                        <i class="bi bi-pencil-square"></i> Preencher Campos
+                    </h5>
                 </div>
+                <form id="fill-form" method="POST" action="/fill/{{ template.id }}" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
+                    {% if fields %}
+                    <div class="card-body" style="overflow-y: auto; flex: 1;">
+                        <p class="text-muted mb-3">
+                            <i class="bi bi-info-circle"></i> Selecione um campo para ver sua localização destacada no PDF.
+                        </p>
 
-                <!-- Email notification -->
-                <div class="card shadow-sm mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">Notificação por Email (Opcional)</h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="form-check mb-3">
-                            <input type="checkbox" class="form-check-input" id="send_email" name="send_email"
-                                   onchange="document.getElementById('emailFields').style.display = this.checked ? 'block' : 'none'">
-                            <label class="form-check-label" for="send_email">
-                                Enviar PDF por email quando completado
+                        {% for field_name, field_info in fields.items() %}
+                        <div class="mb-3 field-group"
+                             data-page="{{ field_info.page + 1 }}"
+                             data-rect="{{ field_info.rect | tojson if field_info.rect else '[]' }}">
+                            <label for="field_{{ loop.index }}" class="form-label">
+                                <strong>{{ field_name }}</strong>
+                                <span class="badge bg-secondary ms-2" style="font-size: 0.7em; cursor: pointer;"
+                                      onclick="goToPage({{ field_info.page + 1 }})"
+                                      title="Clique para ir para a página no PDF">
+                                    📄 Pág. {{ field_info.page + 1 }}
+                                </span>
                             </label>
-                        </div>
-                        <div id="emailFields" style="display: none;">
-                            <div class="mb-3">
-                                <label for="recipient_email" class="form-label">Email do Destinatário *</label>
-                                <input type="email" class="form-control" id="recipient_email" name="recipient_email"
-                                       placeholder="destinatario@exemplo.com">
-                            </div>
-                            <div class="mb-3">
-                                <label for="recipient_name" class="form-label">Nome do Destinatário</label>
-                                <input type="text" class="form-control" id="recipient_name" name="recipient_name"
-                                       placeholder="Nome completo">
-                            </div>
-                        </div>
-                    </div>
-                </div>
 
-                <!-- Form fields -->
-                <div class="card shadow-sm mb-4">
-                    <div class="card-header">
-                        <h5 class="mb-0">Dados do Formulário</h5>
-                    </div>
-                    <div class="card-body">
-                        {% if fields %}
-                        <div class="row g-3">
-                            {% for field_name, field_info in fields.items() %}
-                            <div class="col-md-6">
-                                <div class="mb-3">
-                                    <label for="field_{{ loop.index }}" class="form-label">
-                                        {{ field_name }}
-                                        <span class="badge bg-secondary ms-2">{{ field_info.type }}</span>
+                            {% if field_info.type == 'button' %}
+                                <!-- Checkbox -->
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox"
+                                           id="field_{{ loop.index }}"
+                                           name="{{ field_name }}"
+                                           value="on">
+                                    <label class="form-check-label" for="field_{{ loop.index }}">
+                                        Marcar
                                     </label>
-
-                                    {% if field_info.type == 'button' %}
-                                        <!-- Checkbox -->
-                                        <div class="form-check">
-                                            <input type="checkbox" class="form-check-input"
-                                                   id="field_{{ loop.index }}"
-                                                   name="{{ field_name }}"
-                                                   value="on">
-                                            <label class="form-check-label" for="field_{{ loop.index }}">
-                                                Marcar
-                                            </label>
-                                        </div>
-                                    {% elif field_info.type == 'choice' %}
-                                        <!-- Dropdown -->
-                                        <input type="text" class="form-control"
-                                               id="field_{{ loop.index }}"
-                                               name="{{ field_name }}"
-                                               placeholder="Digite o valor">
-                                    {% else %}
-                                        <!-- Text field -->
-                                        <input type="text" class="form-control"
-                                               id="field_{{ loop.index }}"
-                                               name="{{ field_name }}"
-                                               placeholder="Digite o valor">
-                                    {% endif %}
-
-                                    <div class="form-text">Página: {{ field_info.page + 1 }}</div>
                                 </div>
-                            </div>
-                            {% endfor %}
+                            {% elif field_info.type == 'choice' and field_info.options %}
+                                <!-- Select/Radio -->
+                                <select class="form-select" id="field_{{ loop.index }}" name="{{ field_name }}">
+                                    <option value="">-- Selecione --</option>
+                                    {% for option in field_info.options %}
+                                    <option value="{{ option }}">{{ option }}</option>
+                                    {% endfor %}
+                                </select>
+                            {% else %}
+                                <!-- Text input -->
+                                <input type="text" class="form-control"
+                                       id="field_{{ loop.index }}"
+                                       name="{{ field_name }}"
+                                       placeholder="Digite o valor">
+                            {% endif %}
                         </div>
-                        {% else %}
-                        <div class="alert alert-warning">
-                            Nenhum campo detectado neste PDF.
-                        </div>
-                        {% endif %}
+                        {% endfor %}
                     </div>
-                </div>
 
-                <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                    <a href="/templates/{{ template.id }}" class="btn btn-secondary me-md-2">
-                        Cancelar
-                    </a>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-check-circle"></i> Preencher e Gerar PDF
-                    </button>
-                </div>
-            </form>
+                    <div class="card-footer bg-white border-top" style="flex-shrink: 0;">
+                        <div class="d-grid gap-2">
+                            <button type="submit" class="btn btn-success btn-lg">
+                                <i class="bi bi-file-earmark-pdf"></i> Gerar PDF Preenchido
+                            </button>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="card-body">
+                        <div class="alert alert-warning">
+                            Este PDF não possui campos preenchíveis detectados.
+                        </div>
+                    </div>
+                    {% endif %}
+                </form>
+            </div>
         </div>
     </div>
 </div>
@@ -146,4 +138,232 @@
 
 {% block extra_head %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+    .sticky-top {
+        position: sticky;
+        z-index: 1020;
+    }
+</style>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+    // PDF.js setup
+    const pdfjsLib = window['pdfjs-dist/build/pdf'];
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    let pdfDoc = null;
+    let pageNum = 1;
+    let pageRendering = false;
+    let pageNumPending = null;
+    let scale = 1.5;
+    let currentPage = null;
+    let currentHighlight = null; // Store current highlight state
+
+    const canvas = document.getElementById('pdf-canvas');
+    const ctx = canvas.getContext('2d');
+    const highlightCanvas = document.getElementById('highlight-canvas');
+    const highlightCtx = highlightCanvas.getContext('2d');
+
+    // Load PDF
+    const url = '/templates/{{ template.id }}/download';
+
+    console.log('Loading PDF from:', url);
+
+    // Load PDF with proper configuration
+    const loadingTask = pdfjsLib.getDocument({
+        url: url,
+        withCredentials: true,
+        isEvalSupported: false
+    });
+
+    loadingTask.promise.then(function(pdfDoc_) {
+        pdfDoc = pdfDoc_;
+        document.getElementById('page-count').textContent = pdfDoc.numPages;
+        renderPage(pageNum);
+        console.log('PDF loaded successfully, pages:', pdfDoc.numPages);
+    }).catch(function(error) {
+        console.error('Error loading PDF:', error);
+        // Try to fetch the URL directly to see the actual error
+        fetch(url)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+                return response.blob();
+            })
+            .then(blob => {
+                console.log('Fetch succeeded, blob size:', blob.size, 'type:', blob.type);
+                // If fetch works but PDF.js fails, show different error
+                document.getElementById('pdf-container').innerHTML =
+                    '<div class="alert alert-warning m-3">PDF encontrado mas não pode ser renderizado. Blob size: ' +
+                    blob.size + ', Type: ' + blob.type + '</div>';
+            })
+            .catch(fetchError => {
+                console.error('Fetch error:', fetchError);
+                document.getElementById('pdf-container').innerHTML =
+                    '<div class="alert alert-danger m-3">Erro ao carregar PDF: ' + fetchError.message +
+                    '<br>URL: ' + url + '</div>';
+            });
+    });
+
+    function renderPage(num) {
+        pageRendering = true;
+
+        pdfDoc.getPage(num).then(function(page) {
+            currentPage = page;
+            const viewport = page.getViewport({scale: scale});
+            canvas.height = viewport.height;
+            canvas.width = viewport.width;
+            highlightCanvas.height = viewport.height;
+            highlightCanvas.width = viewport.width;
+
+            const renderContext = {
+                canvasContext: ctx,
+                viewport: viewport
+            };
+
+            const renderTask = page.render(renderContext);
+
+            renderTask.promise.then(function() {
+                pageRendering = false;
+                if (pageNumPending !== null) {
+                    renderPage(pageNumPending);
+                    pageNumPending = null;
+                }
+
+                // Re-apply highlight if exists and matches current page
+                if (currentHighlight && currentHighlight.page === num) {
+                    highlightField(currentHighlight.rect, currentHighlight.page);
+                }
+            });
+        });
+
+        document.getElementById('page-num').textContent = num;
+    }
+
+    function highlightField(rect, page) {
+        // Clear previous highlight
+        highlightCtx.clearRect(0, 0, highlightCanvas.width, highlightCanvas.height);
+
+        if (!rect || rect.length !== 4 || !currentPage || page !== pageNum) {
+            return;
+        }
+
+        // Store current highlight state
+        currentHighlight = { rect: rect, page: page };
+
+        const viewport = currentPage.getViewport({scale: scale});
+
+        // PDF coordinates: [x1, y1, x2, y2] where y is from bottom
+        // Canvas coordinates: y is from top
+        const x = rect[0] * scale;
+        const y = viewport.height - (rect[3] * scale);
+        const width = (rect[2] - rect[0]) * scale;
+        const height = (rect[3] - rect[1]) * scale;
+
+        // Draw highlight rectangle
+        highlightCtx.fillStyle = 'rgba(255, 235, 59, 0.4)'; // Yellow with transparency
+        highlightCtx.fillRect(x, y, width, height);
+
+        // Draw border
+        highlightCtx.strokeStyle = 'rgba(255, 193, 7, 0.8)'; // Darker yellow
+        highlightCtx.lineWidth = 2;
+        highlightCtx.strokeRect(x, y, width, height);
+    }
+
+    function queueRenderPage(num) {
+        if (pageRendering) {
+            pageNumPending = num;
+        } else {
+            renderPage(num);
+        }
+    }
+
+    function onPrevPage() {
+        if (pageNum <= 1) {
+            return;
+        }
+        pageNum--;
+        queueRenderPage(pageNum);
+    }
+
+    function onNextPage() {
+        if (pageNum >= pdfDoc.numPages) {
+            return;
+        }
+        pageNum++;
+        queueRenderPage(pageNum);
+    }
+
+    function zoomIn() {
+        scale += 0.25;
+        document.getElementById('zoom-level').textContent = Math.round(scale * 100);
+        queueRenderPage(pageNum);
+    }
+
+    function zoomOut() {
+        if (scale <= 0.5) return;
+        scale -= 0.25;
+        document.getElementById('zoom-level').textContent = Math.round(scale * 100);
+        queueRenderPage(pageNum);
+    }
+
+    document.getElementById('prev-page').addEventListener('click', onPrevPage);
+    document.getElementById('next-page').addEventListener('click', onNextPage);
+    document.getElementById('zoom-in').addEventListener('click', zoomIn);
+    document.getElementById('zoom-out').addEventListener('click', zoomOut);
+
+    // Function to navigate to specific page
+    window.goToPage = function(page) {
+        if (page >= 1 && page <= (pdfDoc ? pdfDoc.numPages : 1)) {
+            pageNum = page;
+            queueRenderPage(pageNum);
+            // Scroll PDF container to top
+            document.getElementById('pdf-container').scrollTop = 0;
+        }
+    };
+
+    // Highlight field in PDF and form when focusing on input
+    document.querySelectorAll('.field-group input, .field-group select, .field-group textarea').forEach(function(input) {
+        input.addEventListener('focus', function() {
+            const fieldGroup = this.closest('.field-group');
+            const page = parseInt(fieldGroup.getAttribute('data-page'));
+            const rectStr = fieldGroup.getAttribute('data-rect');
+
+            // Highlight the field group in the form
+            fieldGroup.style.backgroundColor = '#fff3cd';
+            fieldGroup.style.border = '2px solid #ffc107';
+            fieldGroup.style.borderRadius = '5px';
+            fieldGroup.style.padding = '10px';
+
+            // Auto-navigate to the page
+            if (page && pdfDoc) {
+                goToPage(page);
+
+                // Wait for page to render, then highlight
+                setTimeout(function() {
+                    try {
+                        const rect = JSON.parse(rectStr);
+                        highlightField(rect, page);
+                    } catch (e) {
+                        console.log('Could not parse rect:', rectStr);
+                    }
+                }, 200);
+            }
+        });
+
+        input.addEventListener('blur', function() {
+            const fieldGroup = this.closest('.field-group');
+            fieldGroup.style.backgroundColor = '';
+            fieldGroup.style.border = '';
+            fieldGroup.style.padding = '';
+
+            // Clear highlight on PDF and state
+            currentHighlight = null;
+            highlightCtx.clearRect(0, 0, highlightCanvas.width, highlightCanvas.height);
+        });
+    });
+</script>
 {% endblock %}

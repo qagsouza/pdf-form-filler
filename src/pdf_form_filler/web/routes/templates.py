@@ -7,7 +7,7 @@ from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
 
 from ...database import get_db
-from ...dependencies import get_current_user
+from ...dependencies import get_current_user, require_user
 from ...models.user import User
 from ...schemas.template import TemplateCreate, TemplateUpdate, TemplateShareCreate
 from ...services.template_service import TemplateService
@@ -246,13 +246,10 @@ async def delete_template(
 @router.get("/templates/{template_id}/download")
 async def download_template(
     template_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_user),
     db: Session = Depends(get_db)
 ):
     """Download template PDF"""
-    if not current_user:
-        return RedirectResponse(url="/login", status_code=302)
-
     template = TemplateService.get_template(db, template_id, current_user.id)
 
     if not template:
@@ -260,11 +257,17 @@ async def download_template(
 
     try:
         file_path = storage_service.get_template_path(template.file_path)
-        return FileResponse(
+
+        # Return FileResponse with headers that allow inline viewing
+        from fastapi.responses import FileResponse
+        response = FileResponse(
             file_path,
-            filename=template.original_filename,
-            media_type="application/pdf"
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": f'inline; filename="{template.original_filename}"'
+            }
         )
+        return response
 
     except PDFFormFillerError as e:
         raise HTTPException(status_code=404, detail=str(e))
