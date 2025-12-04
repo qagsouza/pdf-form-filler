@@ -385,7 +385,10 @@
                         {% for field_name, field_info in fields.items() %}
                         <div class="mb-3">
                             <label for="default_{{ loop.index }}" class="form-label">
-                                <strong>{{ field_name }}</strong>
+                                <strong>{{ field_info.label if field_info.label else field_name }}</strong>
+                                {% if field_info.label %}
+                                <span class="badge bg-info ms-1" style="font-size: 0.65em;">{{ field_name }}</span>
+                                {% endif %}
                                 <span class="badge bg-secondary ms-2" style="font-size: 0.7em;">
                                     Pág. {{ field_info.page + 1 }}
                                 </span>

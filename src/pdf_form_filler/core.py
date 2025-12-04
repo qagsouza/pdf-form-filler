@@ -126,12 +126,19 @@ class PDFFormFiller:
                             except (TypeError, AttributeError):
                                 options = []
 
+                    # Get tooltip/label (alternative user text)
+                    tooltip = annot.get("/TU")
+                    label = None
+                    if tooltip:
+                        label = str(tooltip).strip("()")
+
                     fields[name] = {
                         "type": ftype,
                         "page": page_idx,
                         "value": current_value,
                         "rect": rect_list,
                         "options": options if options else None,
+                        "label": label,
                     }
 
         except Exception:
@@ -181,12 +188,22 @@ class PDFFormFiller:
                     except (ValueError, TypeError):
                         rect_list = None
 
+                # Get tooltip/label
+                tooltip = annotation.get("/TU")
+                label = None
+                if tooltip:
+                    try:
+                        label = str(tooltip).strip("()")
+                    except (ValueError, TypeError):
+                        label = None
+
                 fields[field_name] = {
                     "type": ftype,
                     "page": page_num,
                     "field_type": field_type,
                     "annotation": annotation,
                     "rect": rect_list,
+                    "label": label,
                 }
 
         return fields

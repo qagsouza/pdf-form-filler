@@ -77,13 +77,19 @@
                              data-page="{{ field_info.page + 1 }}"
                              data-rect="{{ field_info.rect | tojson if field_info.rect else '[]' }}">
                             <label for="field_{{ loop.index }}" class="form-label">
-                                <strong>{{ field_name }}</strong>
+                                <strong>{{ field_info.label if field_info.label else field_name }}</strong>
+                                {% if field_info.label %}
+                                <span class="badge bg-info ms-1" style="font-size: 0.65em;" title="Nome do campo">{{ field_name }}</span>
+                                {% endif %}
                                 <span class="badge bg-secondary ms-2" style="font-size: 0.7em; cursor: pointer;"
                                       onclick="goToPage({{ field_info.page + 1 }})"
                                       title="Clique para ir para a página no PDF">
                                     📄 Pág. {{ field_info.page + 1 }}
                                 </span>
                             </label>
+                            {% if field_info.label %}
+                            <div class="form-text text-muted small">{{ field_name }}</div>
+                            {% endif %}
 
                             {% if field_info.type == 'button' %}
                                 <!-- Checkbox -->
