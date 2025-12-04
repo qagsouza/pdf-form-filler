@@ -31,6 +31,9 @@ class Template(Base):
     # Metadata about the PDF fields
     fields_metadata = Column(JSON, nullable=True)
 
+    # Default values for fields
+    default_values = Column(JSON, nullable=True)
+
     # Versioning
     version = Column(Integer, default=1, nullable=False)
 

@@ -399,3 +399,64 @@ def download_excel_template(
 
     except PDFFormFillerError as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/templates/{template_id}/default-values")
+async def save_default_values(
+    template_id: str,
+    request: Request,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Save default values for template fields"""
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=302)
+
+    # Check template access and permission
+    template = TemplateService.get_template(db, template_id, current_user.id)
+
+    if not template:
+        return RedirectResponse(
+            url=f"/templates?error=not_found",
+            status_code=302
+        )
+
+    # Check permission (owner, admin or editor can modify defaults)
+    permission = template.get_permission_for_user(current_user.id)
+    if permission not in ["owner", "admin", "editor"]:
+        return RedirectResponse(
+            url=f"/templates/{template_id}?error=no_permission",
+            status_code=302
+        )
+
+    try:
+        # Parse form data
+        form = await request.form()
+        default_values = {}
+
+        for key, val in form.multi_items():
+            if key.startswith("default_"):
+                # Extract field name
+                field_name = key[8:]  # Remove "default_" prefix
+
+                # Handle checkboxes (HTML sends 'on' when checked)
+                if val == "on":
+                    default_values[field_name] = True
+                elif val and val.strip():  # Only add if not empty
+                    default_values[field_name] = val
+
+        # Update template
+        template.default_values = default_values if default_values else None
+        db.commit()
+
+        return RedirectResponse(
+            url=f"/templates/{template_id}?success=defaults_saved",
+            status_code=302
+        )
+
+    except Exception as e:
+        db.rollback()
+        return RedirectResponse(
+            url=f"/templates/{template_id}?error=save_failed",
+            status_code=302
+        )

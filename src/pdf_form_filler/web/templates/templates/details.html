@@ -38,6 +38,13 @@
             </div>
             {% endif %}
 
+            {% if request.query_params.get('success') == 'defaults_saved' %}
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle"></i> Valores padrão salvos com sucesso!
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
             {% if request.query_params.get('error') == 'user_not_found' %}
             <div class="alert alert-danger alert-dismissible fade show" role="alert">
                 <i class="bi bi-exclamation-triangle"></i> Usuário não encontrado.
@@ -117,6 +124,11 @@
                                 <a href="/fill/{{ template.id }}" class="btn btn-primary">
                                     <i class="bi bi-file-earmark-fill"></i> Preencher Formulário
                                 </a>
+                                {% if is_owner or permission in ['admin', 'editor'] %}
+                                <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#defaultValuesModal">
+                                    <i class="bi bi-pencil-square"></i> Valores Padrão
+                                </button>
+                                {% endif %}
                                 <a href="/batch/{{ template.id }}" class="btn btn-info">
                                     <i class="bi bi-file-earmark-spreadsheet"></i> Preenchimento em Lote
                                 </a>
@@ -308,6 +320,86 @@
     </div>
 </div>
 {% endif %}
+
+<!-- Default Values Modal -->
+{% if is_owner or permission in ['admin', 'editor'] %}
+<div class="modal fade" id="defaultValuesModal" tabindex="-1" aria-labelledby="defaultValuesModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form method="POST" action="/templates/{{ template.id }}/default-values">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="defaultValuesModalLabel">
+                        <i class="bi bi-pencil-square"></i> Definir Valores Padrão
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted mb-3">
+                        <i class="bi bi-info-circle"></i> Defina valores padrão para os campos do formulário.
+                        Estes valores serão automaticamente preenchidos ao iniciar um novo preenchimento.
+                    </p>
+
+                    {% if fields %}
+                    <div style="max-height: 500px; overflow-y: auto;">
+                        {% for field_name, field_info in fields.items() %}
+                        <div class="mb-3">
+                            <label for="default_{{ loop.index }}" class="form-label">
+                                <strong>{{ field_name }}</strong>
+                                <span class="badge bg-secondary ms-2" style="font-size: 0.7em;">
+                                    Pág. {{ field_info.page + 1 }}
+                                </span>
+                            </label>
+
+                            {% if field_info.type == 'button' %}
+                                <!-- Checkbox -->
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox"
+                                           id="default_{{ loop.index }}"
+                                           name="default_{{ field_name }}"
+                                           value="on"
+                                           {% if template.default_values and template.default_values.get(field_name) %}checked{% endif %}>
+                                    <label class="form-check-label" for="default_{{ loop.index }}">
+                                        Marcar por padrão
+                                    </label>
+                                </div>
+                            {% elif field_info.type == 'choice' and field_info.options %}
+                                <!-- Select/Radio -->
+                                <select class="form-select" id="default_{{ loop.index }}" name="default_{{ field_name }}">
+                                    <option value="">-- Sem valor padrão --</option>
+                                    {% for option in field_info.options %}
+                                    <option value="{{ option }}"
+                                            {% if template.default_values and template.default_values.get(field_name) == option %}selected{% endif %}>
+                                        {{ option }}
+                                    </option>
+                                    {% endfor %}
+                                </select>
+                            {% else %}
+                                <!-- Text input -->
+                                <input type="text" class="form-control"
+                                       id="default_{{ loop.index }}"
+                                       name="default_{{ field_name }}"
+                                       value="{{ template.default_values.get(field_name, '') if template.default_values else '' }}"
+                                       placeholder="Deixe vazio para nenhum valor padrão">
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% else %}
+                    <div class="alert alert-warning">
+                        Este template não possui campos configurados.
+                    </div>
+                    {% endif %}
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Salvar Valores Padrão</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
 {% endblock %}
 
 {% block extra_head %}
