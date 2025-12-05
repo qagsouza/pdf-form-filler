@@ -171,11 +171,6 @@
                                 <a href="/templates/{{ template.id }}/download" class="btn btn-secondary">
                                     <i class="bi bi-download"></i> Download PDF
                                 </a>
-                                {% if is_owner or permission in ['admin', 'editor'] %}
-                                <button type="button" class="btn btn-info" data-bs-toggle="modal" data-bs-target="#replaceTemplateModal">
-                                    <i class="bi bi-arrow-repeat"></i> Substituir PDF
-                                </button>
-                                {% endif %}
                                 {% if is_owner %}
                                 <button type="button" class="btn btn-success" data-bs-toggle="modal" data-bs-target="#shareTemplateModal">
                                     <i class="bi bi-share"></i> Compartilhar
@@ -297,7 +292,7 @@
 <div class="modal fade" id="editTemplateModal" tabindex="-1" aria-labelledby="editTemplateModalLabel" aria-hidden="true">
     <div class="modal-dialog">
         <div class="modal-content">
-            <form method="POST" action="/templates/{{ template.id }}/update">
+            <form method="POST" action="/templates/{{ template.id }}/update" enctype="multipart/form-data">
                 <div class="modal-header">
                     <h5 class="modal-title" id="editTemplateModalLabel">Editar Template</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -312,6 +307,52 @@
                         <label for="edit_description" class="form-label">Descrição</label>
                         <textarea class="form-control" id="edit_description" name="description" rows="3">{{ template.description or '' }}</textarea>
                     </div>
+
+                    <hr class="my-4">
+
+                    <h6 class="mb-3">
+                        <i class="bi bi-arrow-repeat"></i> Substituir PDF (opcional)
+                    </h6>
+
+                    <div class="mb-3">
+                        <label for="pdf_file_edit" class="form-label">Novo Arquivo PDF</label>
+                        <input type="file" class="form-control" id="pdf_file_edit" name="file" accept=".pdf">
+                        <div class="form-text">Deixe vazio para manter o PDF atual (máx. 10MB)</div>
+                    </div>
+
+                    <div id="version_options_container" style="display:none;">
+                        <div class="alert alert-warning">
+                            <i class="bi bi-exclamation-triangle"></i> <strong>Atenção:</strong>
+                            <ul class="mb-0 mt-2">
+                                <li>O arquivo PDF atual será substituído pela nova versão</li>
+                                <li>Os campos do formulário serão re-extraídos automaticamente</li>
+                                <li>Valores padrão e compartilhamentos serão mantidos</li>
+                                <li>A versão do template será incrementada</li>
+                            </ul>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="version_type_edit" class="form-label">Tipo de Atualização</label>
+                            <select class="form-select" id="version_type_edit" name="version_type">
+                                <option value="major" selected>
+                                    🔴 Major - Mudança significativa (ex: novos campos, estrutura alterada)
+                                </option>
+                                <option value="minor">
+                                    🟡 Minor - Correção ou ajuste pequeno (ex: texto corrigido, layout ajustado)
+                                </option>
+                            </select>
+                            <div class="form-text">
+                                <strong>Major:</strong> Incrementa versão {{ template.version_major }}.{{ template.version_minor }} → {{ template.version_major + 1 }}.0<br>
+                                <strong>Minor:</strong> Incrementa versão {{ template.version_major }}.{{ template.version_minor }} → {{ template.version_major }}.{{ template.version_minor + 1 }}
+                            </div>
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="version_notes_edit" class="form-label">Notas da Versão (opcional)</label>
+                            <textarea class="form-control" id="version_notes_edit" name="version_notes" rows="3"
+                                      placeholder="Descreva as mudanças nesta versão..."></textarea>
+                        </div>
+                    </div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
@@ -321,6 +362,18 @@
         </div>
     </div>
 </div>
+
+<script>
+// Show/hide version options based on file selection
+document.getElementById('pdf_file_edit').addEventListener('change', function(e) {
+    const versionContainer = document.getElementById('version_options_container');
+    if (e.target.files && e.target.files.length > 0) {
+        versionContainer.style.display = 'block';
+    } else {
+        versionContainer.style.display = 'none';
+    }
+});
+</script>
 {% endif %}
 
 <!-- Share Template Modal -->
@@ -548,69 +601,6 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
                     <button type="submit" class="btn btn-primary">Salvar Propriedades</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-{% endif %}
-
-<!-- Replace Template PDF Modal -->
-{% if is_owner or permission in ['admin', 'editor'] %}
-<div class="modal fade" id="replaceTemplateModal" tabindex="-1" aria-labelledby="replaceTemplateModalLabel" aria-hidden="true">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <form method="POST" action="/templates/{{ template.id }}/replace" enctype="multipart/form-data">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="replaceTemplateModalLabel">
-                        <i class="bi bi-arrow-repeat"></i> Substituir PDF do Template
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="alert alert-warning">
-                        <i class="bi bi-exclamation-triangle"></i> <strong>Atenção:</strong>
-                        <ul class="mb-0 mt-2">
-                            <li>O arquivo PDF atual será substituído pela nova versão</li>
-                            <li>Os campos do formulário serão re-extraídos automaticamente</li>
-                            <li>Valores padrão e compartilhamentos serão mantidos</li>
-                            <li>A versão do template será incrementada</li>
-                        </ul>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="pdf_file" class="form-label">Novo Arquivo PDF</label>
-                        <input type="file" class="form-control" id="pdf_file" name="file" accept=".pdf" required>
-                        <div class="form-text">Selecione o arquivo PDF atualizado (máx. 10MB)</div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="version_type" class="form-label">Tipo de Atualização</label>
-                        <select class="form-select" id="version_type" name="version_type" required>
-                            <option value="major" selected>
-                                🔴 Major - Mudança significativa (ex: novos campos, estrutura alterada)
-                            </option>
-                            <option value="minor">
-                                🟡 Minor - Correção ou ajuste pequeno (ex: texto corrigido, layout ajustado)
-                            </option>
-                        </select>
-                        <div class="form-text">
-                            <strong>Major:</strong> Incrementa versão {{ template.version_major }}.{{ template.version_minor }} → {{ template.version_major + 1 }}.0<br>
-                            <strong>Minor:</strong> Incrementa versão {{ template.version_major }}.{{ template.version_minor }} → {{ template.version_major }}.{{ template.version_minor + 1 }}
-                        </div>
-                    </div>
-
-                    <div class="mb-3">
-                        <label for="version_notes" class="form-label">Notas da Versão (opcional)</label>
-                        <textarea class="form-control" id="version_notes" name="version_notes" rows="3"
-                                  placeholder="Descreva as mudanças nesta versão..."></textarea>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">
-                        <i class="bi bi-upload"></i> Substituir PDF
-                    </button>
                 </div>
             </form>
         </div>

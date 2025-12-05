@@ -173,14 +173,18 @@ async def update_template(
     template_id: str,
     name: str = Form(...),
     description: str = Form(None),
+    file: UploadFile = File(None),
+    version_type: str = Form("major"),
+    version_notes: str = Form(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Update template metadata"""
+    """Update template metadata and optionally replace PDF"""
     if not current_user:
         return RedirectResponse(url="/login", status_code=302)
 
     try:
+        # First update basic metadata
         template_data = TemplateUpdate(name=name, description=description)
         template = TemplateService.update_template(
             db=db,
@@ -195,12 +199,88 @@ async def update_template(
                 status_code=302
             )
 
+        # If a file was provided, replace the PDF
+        if file and file.filename:
+            # Check permission (owner, admin or editor can replace)
+            permission = template.get_permission_for_user(current_user.id)
+            if permission not in ["owner", "admin", "editor"]:
+                return RedirectResponse(
+                    url=f"/templates/{template_id}?error=no_permission",
+                    status_code=302
+                )
+
+            # Validate file
+            if not file.filename.lower().endswith('.pdf'):
+                return RedirectResponse(
+                    url=f"/templates/{template_id}?error=invalid_file",
+                    status_code=302
+                )
+
+            # Read file content
+            content = await file.read()
+
+            # Validate file size (10MB max)
+            if len(content) > 10 * 1024 * 1024:
+                return RedirectResponse(
+                    url=f"/templates/{template_id}?error=file_too_large",
+                    status_code=302
+                )
+
+            # Validate PDF magic bytes
+            if not content.startswith(b"%PDF"):
+                return RedirectResponse(
+                    url=f"/templates/{template_id}?error=invalid_pdf",
+                    status_code=302
+                )
+
+            # Delete old file
+            try:
+                old_path = storage_service.get_template_path(template.file_path)
+                if old_path.exists():
+                    old_path.unlink()
+            except Exception as e:
+                print(f"Warning: Could not delete old file: {e}")
+
+            # Save new file with same path
+            from pathlib import Path
+            new_path = Path(storage_service.base_path) / template.file_path
+            new_path.parent.mkdir(parents=True, exist_ok=True)
+
+            with open(new_path, 'wb') as f:
+                f.write(content)
+
+            # Extract fields from new PDF
+            from ...core import PDFFormFiller
+            pdf_filler = PDFFormFiller(str(new_path))
+            new_fields = pdf_filler.fields
+
+            # Update template
+            template.fields_metadata = new_fields
+
+            # Increment version based on type
+            if version_type == "major":
+                template.version_major += 1
+                template.version_minor = 0
+            else:
+                template.version_minor += 1
+
+            template.original_filename = file.filename
+
+            db.commit()
+
+            return RedirectResponse(
+                url=f"/templates/{template_id}?success=pdf_replaced",
+                status_code=302
+            )
+
+        # If no file, just return success for metadata update
         return RedirectResponse(
             url=f"/templates/{template_id}?success=updated",
             status_code=302
         )
 
     except PDFFormFillerError:
+        db.rollback()
         return RedirectResponse(
             url=f"/templates/{template_id}?error=update_failed",
             status_code=302
