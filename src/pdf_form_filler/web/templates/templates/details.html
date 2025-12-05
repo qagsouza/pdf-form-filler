@@ -159,7 +159,7 @@
                                 </a>
                                 {% if is_owner or permission in ['admin', 'editor'] %}
                                 <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#defaultValuesModal">
-                                    <i class="bi bi-pencil-square"></i> Valores Padrão
+                                    <i class="bi bi-pencil-square"></i> Propriedades dos Campos
                                 </button>
                                 {% endif %}
                                 <a href="/batch/{{ template.id }}" class="btn btn-info">
@@ -367,7 +367,7 @@
             <form method="POST" action="/templates/{{ template.id }}/default-values">
                 <div class="modal-header">
                     <h5 class="modal-title" id="defaultValuesModalLabel">
-                        <i class="bi bi-pencil-square"></i> Definir Valores Padrão
+                        <i class="bi bi-pencil-square"></i> Configurar Propriedades dos Campos
                     </h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
@@ -547,7 +547,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Salvar Valores Padrão</button>
+                    <button type="submit" class="btn btn-primary">Salvar Propriedades</button>
                 </div>
             </form>
         </div>
