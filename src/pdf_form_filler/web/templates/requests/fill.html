@@ -267,8 +267,8 @@
     const highlightCanvas = document.getElementById('highlight-canvas');
     const highlightCtx = highlightCanvas.getContext('2d');
 
-    // Load PDF
-    const url = '/templates/{{ template.id }}/download';
+    // Load PDF (with version parameter to prevent caching after PDF replacement)
+    const url = '/templates/{{ template.id }}/download?v={{ template.version }}';
 
     console.log('Loading PDF from:', url);
 
