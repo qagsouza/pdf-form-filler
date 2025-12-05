@@ -685,3 +685,133 @@ async def replace_template_pdf(
             url=f"/templates/{template_id}?error=replace_failed",
             status_code=302
         )
+
+
+@router.get("/templates/{template_id}/fill-inline", response_class=HTMLResponse)
+async def fill_inline_page(
+    request: Request,
+    template_id: str,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db)
+):
+    """Page for filling PDF inline in browser"""
+    template = TemplateService.get_template(db, template_id, current_user.id)
+
+    if not template:
+        return RedirectResponse(url="/templates?error=not_found", status_code=302)
+
+    permission = template.get_permission_for_user(current_user.id)
+
+    return templates.TemplateResponse(
+        "templates/fill_inline.html",
+        {
+            "request": request,
+            "template": template,
+            "permission": permission,
+            "user": current_user
+        }
+    )
+
+
+@router.get("/templates/{template_id}/pdf-with-defaults")
+async def get_pdf_with_defaults(
+    template_id: str,
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db)
+):
+    """Serve PDF with default values pre-filled"""
+    template = TemplateService.get_template(db, template_id, current_user.id)
+
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    try:
+        # Get template file path
+        file_path = storage_service.get_template_path(template.file_path)
+
+        # Get default values and resolve dynamic values
+        from ...services.dynamic_values import DynamicValueResolver
+
+        # Resolve dynamic values
+        dynamic_values = DynamicValueResolver.resolve_template_values(
+            template, current_user, db
+        )
+
+        # Merge with static defaults
+        all_values = DynamicValueResolver.merge_values(
+            template.default_values,
+            dynamic_values,
+            None,  # No user values yet
+            template.field_config
+        )
+
+        # Fill PDF with default values
+        from ...core import PDFFormFiller
+        pdf_filler = PDFFormFiller(str(file_path))
+        pdf_filler.fill(all_values)
+
+        # Create temporary file with filled PDF
+        import tempfile
+        with tempfile.NamedTemporaryFile(delete=False, suffix='.pdf') as tmp:
+            output_path = tmp.name
+            pdf_filler.save(output_path)
+
+        # Return filled PDF
+        return FileResponse(
+            output_path,
+            media_type="application/pdf",
+            headers={
+                "Content-Disposition": "inline",
+                "Cache-Control": "no-cache"
+            }
+        )
+
+    except Exception as e:
+        print(f"Error serving PDF with defaults: {e}")
+        raise HTTPException(status_code=500, detail="Error loading PDF")
+
+
+@router.post("/templates/{template_id}/submit-inline")
+async def submit_inline_filled(
+    template_id: str,
+    file: UploadFile = File(...),
+    current_user: User = Depends(require_user),
+    db: Session = Depends(get_db)
+):
+    """Receive and save inline-filled PDF"""
+    template = TemplateService.get_template(db, template_id, current_user.id)
+
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+
+    try:
+        # Save the filled PDF
+        content = await file.read()
+
+        # Validate PDF
+        if not content.startswith(b"%PDF"):
+            raise HTTPException(status_code=400, detail="Invalid PDF file")
+
+        # Create output filename
+        import uuid
+        from datetime import datetime
+        filename = f"{template.name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}.pdf"
+
+        # Save to storage
+        output_dir = storage_service.base_path / "filled"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        output_path = output_dir / filename
+
+        with open(output_path, 'wb') as f:
+            f.write(content)
+
+        # Return success with download link
+        return {
+            "success": True,
+            "message": "PDF saved successfully",
+            "download_url": f"/filled/{filename}"
+        }
+
+    except Exception as e:
+        print(f"Error saving filled PDF: {e}")
+        raise HTTPException(status_code=500, detail="Error saving PDF")

@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}Preencher {{ template.name }} - PDF Form Filler{% endblock %}
+
+{% block content %}
+<div class="container-fluid" style="height: 100vh; display: flex; flex-direction: column;">
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1>{{ template.name }}</h1>
+                <div>
+                    <button type="button" class="btn btn-primary" id="submitBtn">
+                        <i class="bi bi-upload"></i> Enviar Formulário Preenchido
+                    </button>
+                    <a href="/templates/{{ template.id }}" class="btn btn-secondary">
+                        <i class="bi bi-arrow-left"></i> Voltar
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Success/Error Messages -->
+    <div id="messageContainer"></div>
+
+    <!-- Instructions -->
+    <div class="row mb-3">
+        <div class="col-12">
+            <div class="alert alert-info">
+                <i class="bi bi-info-circle"></i> <strong>Instruções:</strong>
+                <ul class="mb-0 mt-2">
+                    <li>Preencha o formulário diretamente no visualizador PDF abaixo</li>
+                    <li>Use o visualizador nativo do seu navegador para interagir com os campos</li>
+                    <li>Quando terminar, clique em "Enviar Formulário Preenchido" para salvar</li>
+                    <li>O PDF será salvo com seus dados e ficará disponível para download</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- PDF Viewer -->
+    <div class="row flex-grow-1">
+        <div class="col-12" style="height: 100%;">
+            <iframe
+                id="pdfViewer"
+                src="/templates/{{ template.id }}/pdf-with-defaults?v={{ template.version }}"
+                type="application/pdf"
+                width="100%"
+                height="100%"
+                style="border: 2px solid #dee2e6; border-radius: 5px;"
+                frameborder="0">
+                <p>Seu navegador não suporta visualização de PDF inline.
+                   <a href="/templates/{{ template.id }}/pdf-with-defaults?v={{ template.version }}" target="_blank">
+                       Clique aqui para abrir o PDF em uma nova aba.
+                   </a>
+                </p>
+            </iframe>
+        </div>
+    </div>
+</div>
+
+<script>
+document.getElementById('submitBtn').addEventListener('click', async function() {
+    const btn = this;
+    const originalText = btn.innerHTML;
+
+    try {
+        // Disable button and show loading state
+        btn.disabled = true;
+        btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Enviando...';
+
+        // Get the PDF URL
+        const pdfUrl = '/templates/{{ template.id }}/pdf-with-defaults?v={{ template.version }}';
+
+        // Fetch the PDF
+        const response = await fetch(pdfUrl);
+        if (!response.ok) {
+            throw new Error('Erro ao carregar PDF');
+        }
+
+        const pdfBlob = await response.blob();
+
+        // Create form data
+        const formData = new FormData();
+        formData.append('file', pdfBlob, '{{ template.name }}_preenchido.pdf');
+
+        // Submit to server
+        const submitResponse = await fetch('/templates/{{ template.id }}/submit-inline', {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!submitResponse.ok) {
+            throw new Error('Erro ao salvar PDF');
+        }
+
+        const result = await submitResponse.json();
+
+        // Show success message
+        showMessage('success', 'PDF salvo com sucesso! <a href="' + result.download_url + '" class="alert-link">Clique aqui para baixar</a>');
+
+    } catch (error) {
+        console.error('Error:', error);
+        showMessage('danger', 'Erro ao enviar formulário: ' + error.message);
+    } finally {
+        // Re-enable button
+        btn.disabled = false;
+        btn.innerHTML = originalText;
+    }
+});
+
+function showMessage(type, message) {
+    const container = document.getElementById('messageContainer');
+    const alert = document.createElement('div');
+    alert.className = `alert alert-${type} alert-dismissible fade show`;
+    alert.innerHTML = `
+        ${message}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    `;
+    container.innerHTML = '';
+    container.appendChild(alert);
+
+    // Auto-dismiss after 10 seconds
+    setTimeout(() => {
+        alert.remove();
+    }, 10000);
+}
+</script>
+
+{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+<style>
+    body {
+        overflow: hidden;
+    }
+</style>
+{% endblock %}
