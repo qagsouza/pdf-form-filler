@@ -41,8 +41,9 @@ class Template(Base):
     # Sequence number counter for serial_number dynamic type
     sequence_number = Column(Integer, default=0, nullable=False)
 
-    # Versioning
-    version = Column(Integer, default=1, nullable=False)
+    # Versioning (semantic versioning: major.minor)
+    version_major = Column(Integer, default=1, nullable=False)
+    version_minor = Column(Integer, default=0, nullable=False)
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -54,6 +55,11 @@ class Template(Base):
 
     def __repr__(self):
         return f"<Template(id={self.id}, name={self.name}, owner_id={self.owner_id})>"
+
+    @property
+    def version(self) -> str:
+        """Get formatted version string (major.minor)"""
+        return f"{self.version_major}.{self.version_minor}"
 
     def is_accessible_by(self, user_id: str) -> bool:
         """Check if user has access to this template"""

@@ -550,6 +550,22 @@
                     </div>
 
                     <div class="mb-3">
+                        <label for="version_type" class="form-label">Tipo de Atualização</label>
+                        <select class="form-select" id="version_type" name="version_type" required>
+                            <option value="major" selected>
+                                🔴 Major - Mudança significativa (ex: novos campos, estrutura alterada)
+                            </option>
+                            <option value="minor">
+                                🟡 Minor - Correção ou ajuste pequeno (ex: texto corrigido, layout ajustado)
+                            </option>
+                        </select>
+                        <div class="form-text">
+                            <strong>Major:</strong> Incrementa versão {{ template.version_major }}.{{ template.version_minor }} → {{ template.version_major + 1 }}.0<br>
+                            <strong>Minor:</strong> Incrementa versão {{ template.version_major }}.{{ template.version_minor }} → {{ template.version_major }}.{{ template.version_minor + 1 }}
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
                         <label for="version_notes" class="form-label">Notas da Versão (opcional)</label>
                         <textarea class="form-control" id="version_notes" name="version_notes" rows="3"
                                   placeholder="Descreva as mudanças nesta versão..."></textarea>

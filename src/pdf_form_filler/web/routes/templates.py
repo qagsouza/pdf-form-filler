@@ -493,6 +493,7 @@ async def save_default_values(
 async def replace_template_pdf(
     template_id: str,
     file: UploadFile = File(...),
+    version_type: str = Form("major"),
     version_notes: str = Form(None),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -566,7 +567,16 @@ async def replace_template_pdf(
 
         # Update template
         template.fields_metadata = new_fields
-        template.version += 1
+
+        # Increment version based on type
+        if version_type == "major":
+            # Major update: increment major version, reset minor to 0
+            template.version_major += 1
+            template.version_minor = 0
+        else:
+            # Minor update: increment minor version only
+            template.version_minor += 1
+
         template.original_filename = file.filename
 
         db.commit()
