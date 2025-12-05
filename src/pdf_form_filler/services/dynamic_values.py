@@ -70,7 +70,7 @@ class DynamicValueResolver:
 
         elif dynamic_type == "user_name":
             if user:
-                return user.name or user.username
+                return user.full_name or user.username
             return ""
 
         elif dynamic_type == "user_email":
