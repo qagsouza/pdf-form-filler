@@ -5,7 +5,7 @@ import uuid
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
+from sqlalchemy import and_, func, extract
 
 from ..models.request import (
     Request,
@@ -37,6 +37,35 @@ class RequestService:
         self.storage = storage_service or StorageService()
 
     @staticmethod
+    def _generate_request_number(db: Session) -> str:
+        """
+        Generate next request number in format 0000/YYYY
+        Resets to 0001 each year
+
+        Args:
+            db: Database session
+
+        Returns:
+            Request number string (e.g., "0001/2025")
+        """
+        current_year = datetime.utcnow().year
+
+        # Get the highest number for current year
+        result = db.query(func.max(Request.request_number)).filter(
+            Request.request_number.like(f"%/{current_year}")
+        ).scalar()
+
+        if result:
+            # Extract number from format "NNNN/YYYY"
+            number_part = int(result.split('/')[0])
+            next_number = number_part + 1
+        else:
+            # First request of the year
+            next_number = 1
+
+        return f"{next_number:04d}/{current_year}"
+
+    @staticmethod
     def create_request(
         db: Session,
         user_id: str,
@@ -64,6 +93,7 @@ class RequestService:
         try:
             request = Request(
                 id=str(uuid.uuid4()),
+                request_number=RequestService._generate_request_number(db),
                 template_id=request_data.template_id,
                 requester_id=user_id,
                 type=RequestType.SINGLE,
@@ -117,6 +147,7 @@ class RequestService:
             # Create request
             request = Request(
                 id=str(uuid.uuid4()),
+                request_number=RequestService._generate_request_number(db),
                 template_id=request_data.template_id,
                 requester_id=user_id,
                 type=RequestType.SINGLE,
@@ -255,6 +286,7 @@ class RequestService:
             # Create request
             request = Request(
                 id=str(uuid.uuid4()),
+                request_number=RequestService._generate_request_number(db),
                 template_id=template_id,
                 requester_id=user_id,
                 type=RequestType.BATCH,

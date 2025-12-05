@@ -51,6 +51,9 @@
                         </div>
                         <div class="card-body">
                             <div class="mb-3">
+                                <strong>Nº do Pedido:</strong> <span class="text-primary fs-5">{{ req.request_number or 'N/A' }}</span>
+                            </div>
+                            <div class="mb-3">
                                 <strong>Nome:</strong> {{ req.name or 'Sem nome' }}
                             </div>
                             <div class="mb-3">

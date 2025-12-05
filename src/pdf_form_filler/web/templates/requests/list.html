@@ -74,6 +74,7 @@
                         <table class="table table-hover">
                             <thead>
                                 <tr>
+                                    <th>Nº Pedido</th>
                                     <th>Nome/Template</th>
                                     <th>Preenchido por</th>
                                     <th>Status</th>
@@ -84,6 +85,9 @@
                             <tbody>
                                 {% for item in requests %}
                                 <tr>
+                                    <td>
+                                        <strong class="text-primary">{{ item.request.request_number or 'N/A' }}</strong>
+                                    </td>
                                     <td>
                                         <strong>{{ item.request.name or item.template_name }}</strong><br>
                                         <small class="text-muted">Template: {{ item.template_name }}</small>

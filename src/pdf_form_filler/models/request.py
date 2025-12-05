@@ -37,6 +37,7 @@ class Request(Base):
     __tablename__ = "requests"
 
     id = Column(String, primary_key=True)
+    request_number = Column(String(20), nullable=True, unique=True)  # Format: 0001/2025
     template_id = Column(String, ForeignKey("templates.id", ondelete="CASCADE"), nullable=False)
     requester_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
 
