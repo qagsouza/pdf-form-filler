@@ -2,5 +2,6 @@
 Database models
 """
 from .user import User
+from .group import Group
 
-__all__ = ["User"]
+__all__ = ["User", "Group"]

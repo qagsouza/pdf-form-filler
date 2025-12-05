@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+
+{% block title %}Gerenciar Grupos - Admin{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h1>Gerenciar Grupos</h1>
+                <div>
+                    <button type="button" class="btn btn-success me-2" data-bs-toggle="modal" data-bs-target="#createGroupModal">
+                        <i class="bi bi-people-fill"></i> Novo Grupo
+                    </button>
+                    <a href="/admin/users" class="btn btn-primary me-2">
+                        <i class="bi bi-person-fill"></i> Gerenciar Usuários
+                    </a>
+                    <a href="/dashboard" class="btn btn-secondary">Voltar ao Dashboard</a>
+                </div>
+            </div>
+
+            {% if request.query_params.get('success') == 'group_created' %}
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle"></i> Grupo criado com sucesso!
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            {% if request.query_params.get('success') == 'group_deleted' %}
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle"></i> Grupo excluído com sucesso!
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Nome</th>
+                                    <th>Descrição</th>
+                                    <th>Membros</th>
+                                    <th>Criado por</th>
+                                    <th>Criado em</th>
+                                    <th>Ações</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for group in groups %}
+                                <tr>
+                                    <td><strong>{{ group.name }}</strong></td>
+                                    <td>{{ group.description or '-' }}</td>
+                                    <td>
+                                        <span class="badge bg-primary">{{ group.members|length }} membro(s)</span>
+                                    </td>
+                                    <td>{{ group.owner.full_name }}</td>
+                                    <td>{{ group.created_at.strftime('%d/%m/%Y %H:%M') }}</td>
+                                    <td>
+                                        <div class="btn-group btn-group-sm" role="group">
+                                            <a href="/admin/groups/{{ group.id }}/edit" class="btn btn-info btn-sm" title="Editar">
+                                                <i class="bi bi-pencil"></i>
+                                            </a>
+                                            <button type="button" class="btn btn-danger btn-sm"
+                                                    data-bs-toggle="modal"
+                                                    data-bs-target="#deleteGroupModal{{ group.id }}"
+                                                    title="Excluir">
+                                                <i class="bi bi-trash"></i>
+                                            </button>
+                                        </div>
+
+                                        <!-- Delete Confirmation Modal -->
+                                        <div class="modal fade" id="deleteGroupModal{{ group.id }}" tabindex="-1" aria-hidden="true">
+                                            <div class="modal-dialog">
+                                                <div class="modal-content">
+                                                    <div class="modal-header">
+                                                        <h5 class="modal-title">Confirmar Exclusão</h5>
+                                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                                    </div>
+                                                    <div class="modal-body">
+                                                        <p>Tem certeza que deseja excluir o grupo <strong>{{ group.name }}</strong>?</p>
+                                                        <p class="text-danger">Esta ação não pode ser desfeita!</p>
+                                                    </div>
+                                                    <div class="modal-footer">
+                                                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                        <form method="POST" action="/admin/groups/{{ group.id }}/delete" class="d-inline">
+                                                            <button type="submit" class="btn btn-danger">Excluir</button>
+                                                        </form>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {% if not groups %}
+                    <div class="alert alert-info text-center">
+                        Nenhum grupo cadastrado.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Modal para Criar Grupo -->
+<div class="modal fade" id="createGroupModal" tabindex="-1" aria-labelledby="createGroupModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="/admin/groups/create">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="createGroupModalLabel">Criar Novo Grupo</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    {% if request.query_params.get('error') == 'group_exists' %}
+                    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                        Já existe um grupo com esse nome.
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                    {% endif %}
+
+                    <div class="mb-3">
+                        <label for="group_name" class="form-label">Nome do Grupo</label>
+                        <input type="text" class="form-control" id="group_name" name="name" required>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="group_description" class="form-label">Descrição</label>
+                        <textarea class="form-control" id="group_description" name="description" rows="3"></textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">Membros</label>
+                        {% if all_users %}
+                        <div style="max-height: 300px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 0.25rem; padding: 0.5rem;">
+                            {% for user in all_users %}
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox"
+                                       id="create_member_{{ user.id }}" name="members" value="{{ user.id }}">
+                                <label class="form-check-label" for="create_member_{{ user.id }}">
+                                    <strong>{{ user.full_name }}</strong> ({{ user.username }})
+                                    <br><small class="text-muted">{{ user.email }}</small>
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <div class="form-text">Selecione os usuários que farão parte deste grupo.</div>
+                        {% else %}
+                        <div class="alert alert-warning mb-0">
+                            Nenhum usuário disponível.
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">Criar Grupo</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+{% endblock %}
+
+{% block extra_scripts %}
+{% if request.query_params.get('error') == 'group_exists' %}
+<script>
+    // Reabrir modal se houver erro
+    var myModal = new bootstrap.Modal(document.getElementById('createGroupModal'));
+    myModal.show();
+</script>
+{% endif %}
+{% endblock %}

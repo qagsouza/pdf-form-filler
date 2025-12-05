@@ -5,10 +5,13 @@ from fastapi import APIRouter, Depends, Request, Form
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from sqlalchemy.orm import Session
+from datetime import datetime
+import uuid
 
 from ...database import get_db
 from ...dependencies import require_admin, get_current_user
 from ...models.user import User
+from ...models.group import Group, GroupMember
 from ...models.permission import Role, user_roles
 from ...services.auth_service import AuthService
 from ...schemas.user import UserCreate
@@ -18,6 +21,32 @@ router = APIRouter(prefix="/admin", tags=["web-admin"])
 
 # Templates directory
 templates = Jinja2Templates(directory="src/pdf_form_filler/web/templates")
+
+
+@router.get("", response_class=HTMLResponse)
+@router.get("/", response_class=HTMLResponse)
+def admin_index(
+    request: Request,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Admin index page with tabs for users and groups"""
+    users = db.query(User).order_by(User.created_at.desc()).all()
+    groups = db.query(Group).order_by(Group.created_at.desc()).all()
+    all_roles = db.query(Role).order_by(Role.name).all()
+    all_users = db.query(User).order_by(User.full_name).all()
+
+    return templates.TemplateResponse(
+        request,
+        "admin/index.html",
+        {
+            "current_user": current_user,
+            "users": users,
+            "groups": groups,
+            "all_roles": all_roles,
+            "all_users": all_users
+        }
+    )
 
 
 @router.get("/users", response_class=HTMLResponse)
@@ -54,12 +83,12 @@ async def create_user(
     # Check if email exists
     existing_user = AuthService.get_user_by_email(db, email)
     if existing_user:
-        return RedirectResponse(url="/admin/users?error=email_exists", status_code=302)
+        return RedirectResponse(url="/admin?tab=users&error=email_exists", status_code=302)
 
     # Check if username exists
     existing_user = AuthService.get_user_by_username(db, username)
     if existing_user:
-        return RedirectResponse(url="/admin/users?error=username_exists", status_code=302)
+        return RedirectResponse(url="/admin?tab=users&error=username_exists", status_code=302)
 
     # Create user
     user = User(
@@ -93,7 +122,7 @@ async def create_user(
 
     db.commit()
 
-    return RedirectResponse(url="/admin/users?success=user_created", status_code=302)
+    return RedirectResponse(url="/admin?tab=users&success=user_created", status_code=302)
 
 
 @router.post("/users/{user_id}/approve")
@@ -342,3 +371,209 @@ async def update_user_roles(
             url=f"/admin/users/{user_id}/edit?error=roles_update_failed",
             status_code=302
         )
+
+
+# Group management routes
+
+@router.get("/groups", response_class=HTMLResponse)
+def list_groups(
+    request: Request,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """List all groups for admin"""
+    groups = db.query(Group).order_by(Group.created_at.desc()).all()
+
+    # Get all users for the create group form
+    all_users = db.query(User).order_by(User.full_name).all()
+
+    return templates.TemplateResponse(
+        request,
+        "admin/groups.html",
+        {"current_user": current_user, "groups": groups, "all_users": all_users}
+    )
+
+
+@router.post("/groups/create")
+async def create_group(
+    request: Request,
+    name: str = Form(...),
+    description: str = Form(None),
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Create a new group (admin only)"""
+    # Check if group name exists
+    existing_group = db.query(Group).filter(Group.name == name).first()
+    if existing_group:
+        return RedirectResponse(url="/admin?tab=groups&error=group_exists", status_code=302)
+
+    # Create group
+    group = Group(
+        id=str(uuid.uuid4()),
+        name=name,
+        description=description,
+        owner_id=current_user.id,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow()
+    )
+
+    db.add(group)
+    db.flush()
+
+    # Get selected members from form
+    form = await request.form()
+    selected_user_ids = form.getlist("members")
+
+    # Add members
+    for user_id in selected_user_ids:
+        member = GroupMember(
+            id=str(uuid.uuid4()),
+            group_id=group.id,
+            user_id=user_id,
+            joined_at=datetime.utcnow()
+        )
+        db.add(member)
+
+    db.commit()
+
+    return RedirectResponse(url="/admin?tab=groups&success=group_created", status_code=302)
+
+
+@router.get("/groups/{group_id}/edit", response_class=HTMLResponse)
+def edit_group_page(
+    group_id: str,
+    request: Request,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Show edit group page"""
+    group = db.query(Group).filter(Group.id == group_id).first()
+
+    if not group:
+        return RedirectResponse(url="/admin/groups?error=group_not_found", status_code=302)
+
+    # Get all users
+    all_users = db.query(User).order_by(User.full_name).all()
+
+    # Get group's current members
+    member_user_ids = db.query(GroupMember.user_id).filter(GroupMember.group_id == group_id).all()
+    member_user_ids = [m[0] for m in member_user_ids]
+
+    return templates.TemplateResponse(
+        request,
+        "admin/edit_group.html",
+        {
+            "current_user": current_user,
+            "group": group,
+            "all_users": all_users,
+            "member_user_ids": member_user_ids
+        }
+    )
+
+
+@router.post("/groups/{group_id}/update")
+async def update_group(
+    group_id: str,
+    name: str = Form(...),
+    description: str = Form(None),
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Update group information"""
+    group = db.query(Group).filter(Group.id == group_id).first()
+
+    if not group:
+        return RedirectResponse(url="/admin/groups?error=group_not_found", status_code=302)
+
+    try:
+        # Check if name changed and is in use
+        if name != group.name:
+            existing = db.query(Group).filter(Group.name == name).first()
+            if existing and existing.id != group.id:
+                return RedirectResponse(
+                    url=f"/admin/groups/{group_id}/edit?error=name_in_use",
+                    status_code=302
+                )
+
+        # Update group
+        group.name = name
+        group.description = description
+        group.updated_at = datetime.utcnow()
+
+        db.commit()
+
+        return RedirectResponse(
+            url=f"/admin/groups/{group_id}/edit?success=updated",
+            status_code=302
+        )
+
+    except Exception as e:
+        db.rollback()
+        print(f"Error updating group: {e}")
+        return RedirectResponse(
+            url=f"/admin/groups/{group_id}/edit?error=update_failed",
+            status_code=302
+        )
+
+
+@router.post("/groups/{group_id}/update-members")
+async def update_group_members(
+    group_id: str,
+    request: Request,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Update group members"""
+    group = db.query(Group).filter(Group.id == group_id).first()
+
+    if not group:
+        return RedirectResponse(url="/admin/groups?error=group_not_found", status_code=302)
+
+    try:
+        # Get selected members from form
+        form = await request.form()
+        selected_user_ids = form.getlist("members")
+
+        # Delete existing memberships
+        db.query(GroupMember).filter(GroupMember.group_id == group_id).delete()
+
+        # Add new memberships
+        for user_id in selected_user_ids:
+            member = GroupMember(
+                id=str(uuid.uuid4()),
+                group_id=group_id,
+                user_id=user_id,
+                joined_at=datetime.utcnow()
+            )
+            db.add(member)
+
+        db.commit()
+
+        return RedirectResponse(
+            url=f"/admin/groups/{group_id}/edit?success=members_updated",
+            status_code=302
+        )
+
+    except Exception as e:
+        db.rollback()
+        print(f"Error updating members: {e}")
+        return RedirectResponse(
+            url=f"/admin/groups/{group_id}/edit?error=members_update_failed",
+            status_code=302
+        )
+
+
+@router.post("/groups/{group_id}/delete")
+async def delete_group(
+    group_id: str,
+    current_user: User = Depends(require_admin),
+    db: Session = Depends(get_db)
+):
+    """Delete a group"""
+    group = db.query(Group).filter(Group.id == group_id).first()
+    if group:
+        db.delete(group)
+        db.commit()
+
+    return RedirectResponse(url="/admin?tab=groups&success=group_deleted", status_code=302)

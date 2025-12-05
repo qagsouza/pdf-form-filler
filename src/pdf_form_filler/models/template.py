@@ -74,13 +74,26 @@ class Template(Base):
         return False
 
     def get_permission_for_user(self, user_id: str) -> str:
-        """Get user's permission level for this template"""
+        """Get user's permission level for this template (considering both direct shares and group shares)"""
         if self.owner_id == user_id:
             return "owner"
 
+        # Check direct user shares
         for share in self.shares:
             if share.user_id == user_id:
                 return share.permission.value
+
+        # Check group shares
+        from .group import GroupMember
+        for share in self.shares:
+            if share.group_id:
+                # Check if user is a member of this group
+                for member in share.group.members:
+                    if member.user_id == user_id:
+                        return share.permission.value
+                # Also check if user is the group owner
+                if share.group.owner_id == user_id:
+                    return share.permission.value
 
         return "none"
 
@@ -96,13 +109,18 @@ class TemplateShare(Base):
     """
     Template sharing model
 
-    Represents sharing a template with another user
+    Represents sharing a template with another user or group
+    Can share with either a user OR a group (not both)
     """
     __tablename__ = "template_shares"
 
     id = Column(String, primary_key=True)
     template_id = Column(String, ForeignKey("templates.id", ondelete="CASCADE"), nullable=False)
-    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
+    # Share with either user OR group (one must be NULL)
+    user_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=True)
+    group_id = Column(String, ForeignKey("groups.id", ondelete="CASCADE"), nullable=True)
+
     shared_by_id = Column(String, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     permission = Column(SQLEnum(PermissionLevel), nullable=False, default=PermissionLevel.VIEWER)
@@ -112,7 +130,9 @@ class TemplateShare(Base):
     # Relationships
     template = relationship("Template", back_populates="shares")
     user = relationship("User", foreign_keys=[user_id], back_populates="shared_templates")
+    group = relationship("Group", foreign_keys=[group_id])
     shared_by = relationship("User", foreign_keys=[shared_by_id])
 
     def __repr__(self):
-        return f"<TemplateShare(template_id={self.template_id}, user_id={self.user_id}, permission={self.permission})>"
+        target = f"user_id={self.user_id}" if self.user_id else f"group_id={self.group_id}"
+        return f"<TemplateShare(template_id={self.template_id}, {target}, permission={self.permission})>"
