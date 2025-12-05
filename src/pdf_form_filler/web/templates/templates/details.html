@@ -140,6 +140,11 @@
                                 <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#editTemplateModal">
                                     <i class="bi bi-pencil"></i> Editar
                                 </button>
+                                {% if is_owner %}
+                                <button type="button" class="btn btn-danger ms-2" data-bs-toggle="modal" data-bs-target="#deleteTemplateModal">
+                                    <i class="bi bi-trash"></i> Excluir
+                                </button>
+                                {% endif %}
                             </div>
                             {% endif %}
                         </div>
@@ -603,6 +608,43 @@ document.getElementById('pdf_file_edit').addEventListener('change', function(e) 
                     <button type="submit" class="btn btn-primary">Salvar Propriedades</button>
                 </div>
             </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Delete Template Modal -->
+{% if is_owner %}
+<div class="modal fade" id="deleteTemplateModal" tabindex="-1" aria-labelledby="deleteTemplateModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header bg-danger text-white">
+                <h5 class="modal-title" id="deleteTemplateModalLabel">
+                    <i class="bi bi-exclamation-triangle"></i> Confirmar Exclusão
+                </h5>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <div class="alert alert-danger">
+                    <strong>Atenção:</strong> Esta ação não pode ser desfeita!
+                </div>
+                <p>Tem certeza que deseja excluir o template <strong>{{ template.name }}</strong>?</p>
+                <p>Ao excluir este template:</p>
+                <ul>
+                    <li>O arquivo PDF será removido permanentemente</li>
+                    <li>Todos os compartilhamentos serão removidos</li>
+                    <li>As configurações de campos serão perdidas</li>
+                    <li>Os usuários com acesso compartilhado perderão o acesso</li>
+                </ul>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <form method="POST" action="/templates/{{ template.id }}/delete" class="d-inline">
+                    <button type="submit" class="btn btn-danger">
+                        <i class="bi bi-trash"></i> Sim, Excluir Template
+                    </button>
+                </form>
+            </div>
         </div>
     </div>
 </div>
