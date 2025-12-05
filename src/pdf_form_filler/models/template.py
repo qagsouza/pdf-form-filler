@@ -38,6 +38,9 @@ class Template(Base):
     # Format: {field_name: {"locked": bool, "dynamic_type": str|null}}
     field_config = Column(JSON, nullable=True)
 
+    # Sequence number counter for serial_number dynamic type
+    sequence_number = Column(Integer, default=0, nullable=False)
+
     # Versioning
     version = Column(Integer, default=1, nullable=False)
 

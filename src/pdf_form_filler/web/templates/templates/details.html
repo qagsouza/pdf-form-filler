@@ -483,6 +483,10 @@
                                             {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') == 'user_username' %}selected{% endif %}>
                                         👤 Username do usuário
                                     </option>
+                                    <option value="serial_number"
+                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') == 'serial_number' %}selected{% endif %}>
+                                        🔢 Número de série sequencial
+                                    </option>
                                 </select>
                             </div>
 

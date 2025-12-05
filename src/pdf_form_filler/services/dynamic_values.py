@@ -18,6 +18,7 @@ class DynamicValueResolver:
         "user_name": "Nome do usuário",
         "user_email": "Email do usuário",
         "user_username": "Username do usuário",
+        "serial_number": "Número de série sequencial (gerado na submissão)",
     }
 
     @staticmethod
@@ -33,7 +34,9 @@ class DynamicValueResolver:
     @staticmethod
     def resolve_value(
         dynamic_type: str,
-        user: Optional[Any] = None
+        user: Optional[Any] = None,
+        template: Optional[Any] = None,
+        db_session: Optional[Any] = None
     ) -> str:
         """
         Resolve a dynamic value based on its type
@@ -41,12 +44,14 @@ class DynamicValueResolver:
         Args:
             dynamic_type: Type of dynamic value to resolve
             user: User object for user-related values
+            template: Template object for serial_number type
+            db_session: Database session for serial_number atomicity
 
         Returns:
             Resolved value as string
 
         Raises:
-            ValueError: If dynamic_type is unknown
+            ValueError: If dynamic_type is unknown or requirements not met
         """
         if dynamic_type == "current_date":
             return date.today().isoformat()
@@ -78,13 +83,22 @@ class DynamicValueResolver:
                 return user.username
             return ""
 
+        elif dynamic_type == "serial_number":
+            if not template or not db_session:
+                raise ValueError("serial_number requires template and db_session")
+            # Increment and return the sequence number atomically
+            template.sequence_number += 1
+            db_session.flush()  # Ensure it's persisted immediately
+            return str(template.sequence_number)
+
         else:
             raise ValueError(f"Unknown dynamic type: {dynamic_type}")
 
     @staticmethod
     def resolve_template_values(
         template: Any,
-        user: Optional[Any] = None
+        user: Optional[Any] = None,
+        db_session: Optional[Any] = None
     ) -> Dict[str, str]:
         """
         Resolve all dynamic values for a template
@@ -92,6 +106,7 @@ class DynamicValueResolver:
         Args:
             template: Template object with field_config
             user: User object for user-related values
+            db_session: Database session for serial_number atomicity
 
         Returns:
             Dictionary mapping field names to resolved values
@@ -107,7 +122,9 @@ class DynamicValueResolver:
                 try:
                     resolved[field_name] = DynamicValueResolver.resolve_value(
                         config["dynamic_type"],
-                        user
+                        user,
+                        template,
+                        db_session
                     )
                 except ValueError:
                     # If dynamic type is invalid, skip it

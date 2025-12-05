@@ -117,7 +117,7 @@ def fill_form_page(
 
     # Resolve dynamic values
     from ...services.dynamic_values import DynamicValueResolver
-    dynamic_values = DynamicValueResolver.resolve_template_values(template, current_user)
+    dynamic_values = DynamicValueResolver.resolve_template_values(template, current_user, db)
 
     # Merge default values with dynamic values
     merged_defaults = DynamicValueResolver.merge_values(
@@ -170,7 +170,7 @@ async def submit_fill_form(
 
             # Resolve dynamic values once
             from ...services.dynamic_values import DynamicValueResolver
-            dynamic_values = DynamicValueResolver.resolve_template_values(template, current_user)
+            dynamic_values = DynamicValueResolver.resolve_template_values(template, current_user, db)
 
             # Initialize email service if needed
             email_service = None
@@ -233,7 +233,7 @@ async def submit_fill_form(
 
             # Resolve dynamic values and merge with user data
             from ...services.dynamic_values import DynamicValueResolver
-            dynamic_values = DynamicValueResolver.resolve_template_values(template, current_user)
+            dynamic_values = DynamicValueResolver.resolve_template_values(template, current_user, db)
 
             # Merge: dynamic values override user input for locked fields
             final_data = DynamicValueResolver.merge_values(
