@@ -778,7 +778,10 @@ async def submit_inline_filled(
     current_user: User = Depends(require_user),
     db: Session = Depends(get_db)
 ):
-    """Receive and save inline-filled PDF"""
+    """Receive and save inline-filled PDF and create request"""
+    from ..models.request import Request, RequestInstance, RequestType, RequestStatus, InstanceStatus
+    from ..services.request_service import RequestService
+
     template = TemplateService.get_template(db, template_id, current_user.id)
 
     if not template:
@@ -792,26 +795,67 @@ async def submit_inline_filled(
         if not content.startswith(b"%PDF"):
             raise HTTPException(status_code=400, detail="Invalid PDF file")
 
-        # Create output filename
+        # Create request first to get request_number
         import uuid
         from datetime import datetime
-        filename = f"{template.name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{uuid.uuid4().hex[:8]}.pdf"
 
-        # Save to storage
-        output_dir = storage_service.base_path / "filled"
-        output_dir.mkdir(parents=True, exist_ok=True)
-        output_path = output_dir / filename
+        request = Request(
+            id=str(uuid.uuid4()),
+            request_number=RequestService._generate_request_number(db),
+            template_id=template_id,
+            requester_id=current_user.id,
+            type=RequestType.SINGLE,
+            status=RequestStatus.COMPLETED,
+            name=f"Preenchimento inline - {template.name}",
+            completed_at=datetime.utcnow()
+        )
 
-        with open(output_path, 'wb') as f:
-            f.write(content)
+        db.add(request)
+        db.flush()
 
-        # Return success with download link
+        # Create instance
+        instance = RequestInstance(
+            id=str(uuid.uuid4()),
+            request_id=request.id,
+            data={},  # No structured data from inline filling
+            status=InstanceStatus.COMPLETED,
+            processed_at=datetime.utcnow()
+        )
+
+        db.add(instance)
+        db.flush()
+
+        # Create output filename using request and instance IDs
+        filename = f"{instance.id}.pdf"
+
+        # Save to storage using the proper path structure
+        from io import BytesIO
+        filled_path = storage_service.save_filled_pdf(
+            file=BytesIO(content),
+            user_id=current_user.id,
+            request_id=request.id,
+            instance_id=instance.id,
+            filename=filename
+        )
+
+        # Update instance with file path
+        instance.filled_pdf_path = filled_path
+
+        db.commit()
+        db.refresh(request)
+
+        # Return success with request details
         return {
             "success": True,
             "message": "PDF saved successfully",
-            "download_url": f"/filled/{filename}"
+            "request_id": request.id,
+            "request_number": request.request_number,
+            "download_url": f"/requests/{request.id}/download/{instance.id}"
         }
 
     except Exception as e:
+        db.rollback()
         print(f"Error saving filled PDF: {e}")
-        raise HTTPException(status_code=500, detail="Error saving PDF")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Error saving PDF: {str(e)}")
