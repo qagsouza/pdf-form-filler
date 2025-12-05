@@ -115,12 +115,26 @@ def fill_form_page(
     except PDFFormFillerError:
         fields = {}
 
+    # Resolve dynamic values
+    from ...services.dynamic_values import DynamicValueResolver
+    dynamic_values = DynamicValueResolver.resolve_template_values(template, current_user)
+
+    # Merge default values with dynamic values
+    merged_defaults = DynamicValueResolver.merge_values(
+        default_values=template.default_values,
+        dynamic_values=dynamic_values,
+        user_values=None,
+        field_config=template.field_config
+    )
+
     return templates.TemplateResponse(
         http_request,
         "requests/fill.html",
         {
             "template": template,
             "fields": fields,
+            "merged_defaults": merged_defaults,
+            "field_config": template.field_config or {},
             "current_user": current_user
         }
     )
@@ -138,6 +152,11 @@ async def submit_fill_form(
         return RedirectResponse(url="/login", status_code=302)
 
     try:
+        # Get template first (need for dynamic values)
+        template = TemplateService.get_template(db, template_id, current_user.id)
+        if not template:
+            return RedirectResponse(url="/templates?error=not_found", status_code=302)
+
         # Parse form data
         form = await http_request.form()
         data = {}
@@ -156,6 +175,18 @@ async def submit_fill_form(
                 if val and val.strip():
                     data[key] = val
 
+        # Resolve dynamic values and merge with user data
+        from ...services.dynamic_values import DynamicValueResolver
+        dynamic_values = DynamicValueResolver.resolve_template_values(template, current_user)
+
+        # Merge: dynamic values override user input for locked fields
+        final_data = DynamicValueResolver.merge_values(
+            default_values=template.default_values,
+            dynamic_values=dynamic_values,
+            user_values=data,
+            field_config=template.field_config
+        )
+
         # Get optional fields
         request_name = form.get("request_name", "").strip() or None
         request_notes = form.get("request_notes", "").strip() or None
@@ -170,7 +201,7 @@ async def submit_fill_form(
             template_id=template_id,
             name=request_name,
             notes=request_notes,
-            data=data,
+            data=final_data,
             recipient_email=recipient_email,
             recipient_name=recipient_name,
             send_email=send_email

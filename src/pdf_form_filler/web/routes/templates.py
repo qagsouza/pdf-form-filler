@@ -433,20 +433,47 @@ async def save_default_values(
         # Parse form data
         form = await request.form()
         default_values = {}
+        field_config = {}
 
-        for key, val in form.multi_items():
-            if key.startswith("default_"):
-                # Extract field name
-                field_name = key[8:]  # Remove "default_" prefix
+        # Get all field names from template
+        field_names = list(template.fields_metadata.keys()) if template.fields_metadata else []
 
-                # Handle checkboxes (HTML sends 'on' when checked)
-                if val == "on":
-                    default_values[field_name] = True
-                elif val and val.strip():  # Only add if not empty
-                    default_values[field_name] = val
+        # Process each field
+        for field_name in field_names:
+            # Check value type (static or dynamic)
+            value_type = form.get(f"value_type_{field_name}", "static")
+
+            if value_type == "dynamic":
+                # Dynamic value
+                dynamic_type = form.get(f"dynamic_type_{field_name}")
+                if dynamic_type and dynamic_type.strip():
+                    field_config[field_name] = {
+                        "dynamic_type": dynamic_type
+                    }
+            else:
+                # Static value
+                default_key = f"default_{field_name}"
+                if default_key in form:
+                    val = form.get(default_key)
+
+                    # Handle checkboxes (HTML sends 'on' when checked)
+                    if val == "on":
+                        default_values[field_name] = True
+                    elif val and val.strip():  # Only add if not empty
+                        default_values[field_name] = val
+
+            # Check if field is locked
+            locked_key = f"locked_{field_name}"
+            if locked_key in form and form.get(locked_key) == "true":
+                if field_name not in field_config:
+                    field_config[field_name] = {}
+                field_config[field_name]["locked"] = True
+            elif field_name in field_config:
+                field_config[field_name]["locked"] = False
 
         # Update template
         template.default_values = default_values if default_values else None
+        template.field_config = field_config if field_config else None
         db.commit()
 
         return RedirectResponse(

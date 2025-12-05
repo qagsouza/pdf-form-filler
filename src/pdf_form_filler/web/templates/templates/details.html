@@ -378,13 +378,15 @@
                     <p class="text-muted mb-3">
                         <i class="bi bi-info-circle"></i> Defina valores padrão para os campos do formulário.
                         Estes valores serão automaticamente preenchidos ao iniciar um novo preenchimento.
+                        <br><strong>Valores dinâmicos:</strong> São calculados automaticamente (ex: data atual, nome do usuário).
+                        <br><strong>Campos travados:</strong> Não podem ser editados pelos usuários ao preencher o formulário.
                     </p>
 
                     {% if fields %}
                     <div style="max-height: 500px; overflow-y: auto;">
                         {% for field_name, field_info in fields.items() %}
-                        <div class="mb-3">
-                            <label for="default_{{ loop.index }}" class="form-label">
+                        <div class="mb-4 border-bottom pb-3">
+                            <label class="form-label">
                                 <strong>{{ field_info.label if field_info.label else field_name }}</strong>
                                 {% if field_info.label %}
                                 <span class="badge bg-info ms-1" style="font-size: 0.65em;">{{ field_name }}</span>
@@ -394,37 +396,107 @@
                                 </span>
                             </label>
 
-                            {% if field_info.type == 'button' %}
-                                <!-- Checkbox -->
-                                <div class="form-check">
-                                    <input class="form-check-input" type="checkbox"
+                            <!-- Value Type Selector -->
+                            <div class="mb-2">
+                                <label class="form-label small">Tipo de valor:</label>
+                                <select class="form-select form-select-sm value-type-selector"
+                                        data-field-index="{{ loop.index }}"
+                                        name="value_type_{{ field_name }}">
+                                    <option value="static"
+                                            {% if not template.field_config or not template.field_config.get(field_name) or not template.field_config.get(field_name).get('dynamic_type') %}selected{% endif %}>
+                                        Valor estático
+                                    </option>
+                                    <option value="dynamic"
+                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') %}selected{% endif %}>
+                                        Valor dinâmico
+                                    </option>
+                                </select>
+                            </div>
+
+                            <!-- Static Value Input -->
+                            <div class="static-value-container-{{ loop.index }}"
+                                 style="{% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') %}display:none;{% endif %}">
+                                {% if field_info.type == 'button' %}
+                                    <div class="form-check">
+                                        <input class="form-check-input" type="checkbox"
+                                               id="default_{{ loop.index }}"
+                                               name="default_{{ field_name }}"
+                                               value="on"
+                                               {% if template.default_values and template.default_values.get(field_name) %}checked{% endif %}>
+                                        <label class="form-check-label" for="default_{{ loop.index }}">
+                                            Marcar por padrão
+                                        </label>
+                                    </div>
+                                {% elif field_info.type == 'choice' and field_info.options %}
+                                    <select class="form-select" id="default_{{ loop.index }}" name="default_{{ field_name }}">
+                                        <option value="">-- Sem valor padrão --</option>
+                                        {% for option in field_info.options %}
+                                        <option value="{{ option }}"
+                                                {% if template.default_values and template.default_values.get(field_name) == option %}selected{% endif %}>
+                                            {{ option }}
+                                        </option>
+                                        {% endfor %}
+                                    </select>
+                                {% else %}
+                                    <input type="text" class="form-control"
                                            id="default_{{ loop.index }}"
                                            name="default_{{ field_name }}"
-                                           value="on"
-                                           {% if template.default_values and template.default_values.get(field_name) %}checked{% endif %}>
-                                    <label class="form-check-label" for="default_{{ loop.index }}">
-                                        Marcar por padrão
-                                    </label>
-                                </div>
-                            {% elif field_info.type == 'choice' and field_info.options %}
-                                <!-- Select/Radio -->
-                                <select class="form-select" id="default_{{ loop.index }}" name="default_{{ field_name }}">
-                                    <option value="">-- Sem valor padrão --</option>
-                                    {% for option in field_info.options %}
-                                    <option value="{{ option }}"
-                                            {% if template.default_values and template.default_values.get(field_name) == option %}selected{% endif %}>
-                                        {{ option }}
+                                           value="{{ template.default_values.get(field_name, '') if template.default_values else '' }}"
+                                           placeholder="Deixe vazio para nenhum valor padrão">
+                                {% endif %}
+                            </div>
+
+                            <!-- Dynamic Value Selector -->
+                            <div class="dynamic-value-container-{{ loop.index }}"
+                                 style="{% if not template.field_config or not template.field_config.get(field_name) or not template.field_config.get(field_name).get('dynamic_type') %}display:none;{% endif %}">
+                                <select class="form-select" name="dynamic_type_{{ field_name }}">
+                                    <option value="">-- Selecione um tipo --</option>
+                                    <option value="current_date"
+                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') == 'current_date' %}selected{% endif %}>
+                                        📅 Data atual (YYYY-MM-DD)
                                     </option>
-                                    {% endfor %}
+                                    <option value="current_date_br"
+                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') == 'current_date_br' %}selected{% endif %}>
+                                        📅 Data atual (DD/MM/YYYY)
+                                    </option>
+                                    <option value="current_datetime"
+                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') == 'current_datetime' %}selected{% endif %}>
+                                        🕐 Data e hora atual
+                                    </option>
+                                    <option value="current_time"
+                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') == 'current_time' %}selected{% endif %}>
+                                        🕐 Hora atual
+                                    </option>
+                                    <option value="current_year"
+                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') == 'current_year' %}selected{% endif %}>
+                                        📅 Ano atual
+                                    </option>
+                                    <option value="user_name"
+                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') == 'user_name' %}selected{% endif %}>
+                                        👤 Nome do usuário
+                                    </option>
+                                    <option value="user_email"
+                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') == 'user_email' %}selected{% endif %}>
+                                        ✉️ Email do usuário
+                                    </option>
+                                    <option value="user_username"
+                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') == 'user_username' %}selected{% endif %}>
+                                        👤 Username do usuário
+                                    </option>
                                 </select>
-                            {% else %}
-                                <!-- Text input -->
-                                <input type="text" class="form-control"
-                                       id="default_{{ loop.index }}"
-                                       name="default_{{ field_name }}"
-                                       value="{{ template.default_values.get(field_name, '') if template.default_values else '' }}"
-                                       placeholder="Deixe vazio para nenhum valor padrão">
-                            {% endif %}
+                            </div>
+
+                            <!-- Lock Field Checkbox -->
+                            <div class="form-check mt-2">
+                                <input class="form-check-input" type="checkbox"
+                                       id="locked_{{ loop.index }}"
+                                       name="locked_{{ field_name }}"
+                                       value="true"
+                                       {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('locked') %}checked{% endif %}>
+                                <label class="form-check-label small text-muted" for="locked_{{ loop.index }}">
+                                    🔒 Travar campo (não editável no preenchimento)
+                                </label>
+                            </div>
                         </div>
                         {% endfor %}
                     </div>
@@ -495,4 +567,29 @@
 
 {% block extra_head %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+// Handle value type selector change
+document.addEventListener('DOMContentLoaded', function() {
+    const valueTypeSelectors = document.querySelectorAll('.value-type-selector');
+
+    valueTypeSelectors.forEach(function(selector) {
+        selector.addEventListener('change', function() {
+            const fieldIndex = this.dataset.fieldIndex;
+            const staticContainer = document.querySelector(`.static-value-container-${fieldIndex}`);
+            const dynamicContainer = document.querySelector(`.dynamic-value-container-${fieldIndex}`);
+
+            if (this.value === 'static') {
+                staticContainer.style.display = 'block';
+                dynamicContainer.style.display = 'none';
+            } else {
+                staticContainer.style.display = 'none';
+                dynamicContainer.style.display = 'block';
+            }
+        });
+    });
+});
+</script>
 {% endblock %}

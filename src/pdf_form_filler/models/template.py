@@ -34,6 +34,10 @@ class Template(Base):
     # Default values for fields
     default_values = Column(JSON, nullable=True)
 
+    # Field configuration: locked status, dynamic values
+    # Format: {field_name: {"locked": bool, "dynamic_type": str|null}}
+    field_config = Column(JSON, nullable=True)
+
     # Versioning
     version = Column(Integer, default=1, nullable=False)
 

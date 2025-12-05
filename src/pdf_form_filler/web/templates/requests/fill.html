@@ -91,6 +91,10 @@
                             <div class="form-text text-muted small">{{ field_name }}</div>
                             {% endif %}
 
+                            {% set is_locked = field_config.get(field_name, {}).get('locked', False) %}
+                            {% set field_value = merged_defaults.get(field_name, '') %}
+                            {% set is_dynamic = field_config.get(field_name, {}).get('dynamic_type') %}
+
                             {% if field_info.type == 'button' %}
                                 <!-- Checkbox -->
                                 <div class="form-check">
@@ -98,29 +102,46 @@
                                            id="field_{{ loop.index }}"
                                            name="{{ field_name }}"
                                            value="on"
-                                           {% if template.default_values and template.default_values.get(field_name) %}checked{% endif %}>
+                                           {% if field_value %}checked{% endif %}
+                                           {% if is_locked %}disabled{% endif %}>
                                     <label class="form-check-label" for="field_{{ loop.index }}">
                                         Marcar
+                                        {% if is_locked %}
+                                        <span class="badge bg-warning text-dark ms-1" style="font-size: 0.7em;">🔒 Travado</span>
+                                        {% endif %}
                                     </label>
+                                    {% if is_locked %}
+                                    <input type="hidden" name="{{ field_name }}" value="{% if field_value %}on{% endif %}">
+                                    {% endif %}
                                 </div>
                             {% elif field_info.type == 'choice' and field_info.options %}
                                 <!-- Select/Radio -->
-                                <select class="form-select" id="field_{{ loop.index }}" name="{{ field_name }}">
+                                <select class="form-select" id="field_{{ loop.index }}" name="{{ field_name }}"
+                                        {% if is_locked %}disabled{% endif %}>
                                     <option value="">-- Selecione --</option>
                                     {% for option in field_info.options %}
                                     <option value="{{ option }}"
-                                            {% if template.default_values and template.default_values.get(field_name) == option %}selected{% endif %}>
+                                            {% if field_value == option %}selected{% endif %}>
                                         {{ option }}
                                     </option>
                                     {% endfor %}
                                 </select>
+                                {% if is_locked %}
+                                <input type="hidden" name="{{ field_name }}" value="{{ field_value }}">
+                                <small class="text-muted">🔒 Campo travado{% if is_dynamic %} (valor dinâmico){% endif %}</small>
+                                {% endif %}
                             {% else %}
                                 <!-- Text input -->
                                 <input type="text" class="form-control"
                                        id="field_{{ loop.index }}"
                                        name="{{ field_name }}"
-                                       value="{{ template.default_values.get(field_name, '') if template.default_values else '' }}"
-                                       placeholder="Digite o valor">
+                                       value="{{ field_value }}"
+                                       placeholder="Digite o valor"
+                                       {% if is_locked %}readonly{% endif %}
+                                       {% if is_locked %}style="background-color: #f8f9fa;"{% endif %}>
+                                {% if is_locked %}
+                                <small class="text-muted">🔒 Campo travado{% if is_dynamic %} (valor dinâmico){% endif %}</small>
+                                {% endif %}
                             {% endif %}
                         </div>
                         {% endfor %}
