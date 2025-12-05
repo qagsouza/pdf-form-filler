@@ -413,6 +413,39 @@
                                 </select>
                             </div>
 
+                            <!-- Field Type Selector -->
+                            <div class="mb-2">
+                                <label class="form-label small">Tipo de campo:</label>
+                                <select class="form-select form-select-sm"
+                                        name="field_type_{{ field_name }}">
+                                    <option value="text"
+                                            {% if not template.field_config or not template.field_config.get(field_name) or not template.field_config.get(field_name).get('field_type') or template.field_config.get(field_name).get('field_type') == 'text' %}selected{% endif %}>
+                                        📝 Texto
+                                    </option>
+                                    <option value="number"
+                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('field_type') == 'number' %}selected{% endif %}>
+                                        🔢 Número
+                                    </option>
+                                    <option value="date"
+                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('field_type') == 'date' %}selected{% endif %}>
+                                        📅 Data
+                                    </option>
+                                    <option value="email"
+                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('field_type') == 'email' %}selected{% endif %}>
+                                        ✉️ Email
+                                    </option>
+                                    <option value="tel"
+                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('field_type') == 'tel' %}selected{% endif %}>
+                                        📞 Telefone
+                                    </option>
+                                    <option value="url"
+                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('field_type') == 'url' %}selected{% endif %}>
+                                        🔗 URL
+                                    </option>
+                                </select>
+                                <small class="form-text text-muted">Define o tipo de input e validação no formulário de preenchimento</small>
+                            </div>
+
                             <!-- Static Value Input -->
                             <div class="static-value-container-{{ loop.index }}"
                                  style="{% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') %}display:none;{% endif %}">

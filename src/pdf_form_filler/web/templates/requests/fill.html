@@ -171,14 +171,62 @@
                                 <small class="text-muted">🔒 Campo travado{% if is_dynamic %} (valor dinâmico){% endif %}</small>
                                 {% endif %}
                             {% else %}
-                                <!-- Text input -->
-                                <input type="text" class="form-control"
-                                       id="field_{{ loop.index }}"
-                                       name="{{ field_name }}"
-                                       value="{{ field_value }}"
-                                       placeholder="Digite o valor"
-                                       {% if is_locked %}readonly{% endif %}
-                                       {% if is_locked %}style="background-color: #f8f9fa;"{% endif %}>
+                                <!-- Text/Number/Date/Email/Tel/URL input -->
+                                {% set field_type = field_config.get(field_name, {}).get('field_type', 'text') if field_config else 'text' %}
+                                {% if field_type == 'date' %}
+                                    <input type="date" class="form-control"
+                                           id="field_{{ loop.index }}"
+                                           name="{{ field_name }}"
+                                           value="{{ field_value }}"
+                                           {% if is_locked %}readonly{% endif %}
+                                           {% if is_locked %}style="background-color: #f8f9fa;"{% endif %}>
+                                    <small class="form-text text-muted">📅 Selecione uma data</small>
+                                {% elif field_type == 'number' %}
+                                    <input type="number" class="form-control"
+                                           id="field_{{ loop.index }}"
+                                           name="{{ field_name }}"
+                                           value="{{ field_value }}"
+                                           placeholder="Digite um número"
+                                           step="any"
+                                           {% if is_locked %}readonly{% endif %}
+                                           {% if is_locked %}style="background-color: #f8f9fa;"{% endif %}>
+                                    <small class="form-text text-muted">🔢 Apenas números</small>
+                                {% elif field_type == 'email' %}
+                                    <input type="email" class="form-control"
+                                           id="field_{{ loop.index }}"
+                                           name="{{ field_name }}"
+                                           value="{{ field_value }}"
+                                           placeholder="email@exemplo.com"
+                                           {% if is_locked %}readonly{% endif %}
+                                           {% if is_locked %}style="background-color: #f8f9fa;"{% endif %}>
+                                    <small class="form-text text-muted">✉️ Formato de email</small>
+                                {% elif field_type == 'tel' %}
+                                    <input type="tel" class="form-control"
+                                           id="field_{{ loop.index }}"
+                                           name="{{ field_name }}"
+                                           value="{{ field_value }}"
+                                           placeholder="(00) 00000-0000"
+                                           {% if is_locked %}readonly{% endif %}
+                                           {% if is_locked %}style="background-color: #f8f9fa;"{% endif %}>
+                                    <small class="form-text text-muted">📞 Número de telefone</small>
+                                {% elif field_type == 'url' %}
+                                    <input type="url" class="form-control"
+                                           id="field_{{ loop.index }}"
+                                           name="{{ field_name }}"
+                                           value="{{ field_value }}"
+                                           placeholder="https://exemplo.com"
+                                           {% if is_locked %}readonly{% endif %}
+                                           {% if is_locked %}style="background-color: #f8f9fa;"{% endif %}>
+                                    <small class="form-text text-muted">🔗 URL completa</small>
+                                {% else %}
+                                    <input type="text" class="form-control"
+                                           id="field_{{ loop.index }}"
+                                           name="{{ field_name }}"
+                                           value="{{ field_value }}"
+                                           placeholder="Digite o valor"
+                                           {% if is_locked %}readonly{% endif %}
+                                           {% if is_locked %}style="background-color: #f8f9fa;"{% endif %}>
+                                {% endif %}
                                 {% if is_locked %}
                                 <small class="text-muted">🔒 Campo travado{% if is_dynamic %} (valor dinâmico){% endif %}</small>
                                 {% endif %}

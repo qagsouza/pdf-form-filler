@@ -462,6 +462,13 @@ async def save_default_values(
                     elif val and val.strip():  # Only add if not empty
                         default_values[field_name] = val
 
+            # Get field type configuration
+            field_type = form.get(f"field_type_{field_name}", "text")
+            if field_type and field_type != "text":  # Only store if not default
+                if field_name not in field_config:
+                    field_config[field_name] = {}
+                field_config[field_name]["field_type"] = field_type
+
             # Check if field is locked
             locked_key = f"locked_{field_name}"
             if locked_key in form and form.get(locked_key) == "true":
