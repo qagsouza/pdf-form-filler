@@ -426,6 +426,10 @@
                                             {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('field_type') == 'url' %}selected{% endif %}>
                                         🔗 URL
                                     </option>
+                                    <option value="cpf"
+                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('field_type') == 'cpf' %}selected{% endif %}>
+                                        🆔 CPF
+                                    </option>
                                 </select>
                                 <small class="form-text text-muted">Define o tipo de input e validação no formulário de preenchimento</small>
                             </div>

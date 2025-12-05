@@ -218,6 +218,18 @@
                                            {% if is_locked %}readonly{% endif %}
                                            {% if is_locked %}style="background-color: #f8f9fa;"{% endif %}>
                                     <small class="form-text text-muted">🔗 URL completa</small>
+                                {% elif field_type == 'cpf' %}
+                                    <input type="text" class="form-control cpf-input"
+                                           id="field_{{ loop.index }}"
+                                           name="{{ field_name }}"
+                                           value="{{ field_value }}"
+                                           placeholder="000.000.000-00"
+                                           maxlength="14"
+                                           pattern="\d{3}\.\d{3}\.\d{3}-\d{2}"
+                                           {% if is_locked %}readonly{% endif %}
+                                           {% if is_locked %}style="background-color: #f8f9fa;"{% endif %}>
+                                    <small class="form-text text-muted">🆔 CPF válido (000.000.000-00)</small>
+                                    <div class="invalid-feedback">CPF inválido</div>
                                 {% else %}
                                     <input type="text" class="form-control"
                                            id="field_{{ loop.index }}"
@@ -722,5 +734,71 @@
             statusDiv.innerHTML = `<div class="alert alert-danger">Erro ao processar arquivo: ${error.message}</div>`;
         }
     });
+
+    // CPF Mask and Validation
+    document.querySelectorAll('.cpf-input').forEach(function(input) {
+        // Apply mask on input
+        input.addEventListener('input', function(e) {
+            let value = e.target.value.replace(/\D/g, ''); // Remove non-digits
+
+            // Apply mask: 000.000.000-00
+            if (value.length > 11) value = value.substr(0, 11);
+
+            if (value.length > 9) {
+                value = value.replace(/(\d{3})(\d{3})(\d{3})(\d{0,2})/, '$1.$2.$3-$4');
+            } else if (value.length > 6) {
+                value = value.replace(/(\d{3})(\d{3})(\d{0,3})/, '$1.$2.$3');
+            } else if (value.length > 3) {
+                value = value.replace(/(\d{3})(\d{0,3})/, '$1.$2');
+            }
+
+            e.target.value = value;
+        });
+
+        // Validate CPF on blur
+        input.addEventListener('blur', function(e) {
+            const cpf = e.target.value.replace(/\D/g, '');
+
+            if (cpf.length === 0) {
+                e.target.setCustomValidity('');
+                e.target.classList.remove('is-invalid');
+                return;
+            }
+
+            if (cpf.length !== 11 || !validateCPF(cpf)) {
+                e.target.setCustomValidity('CPF inválido');
+                e.target.classList.add('is-invalid');
+            } else {
+                e.target.setCustomValidity('');
+                e.target.classList.remove('is-invalid');
+            }
+        });
+    });
+
+    // CPF Validation Algorithm
+    function validateCPF(cpf) {
+        // Check if all digits are the same
+        if (/^(\d)\1{10}$/.test(cpf)) return false;
+
+        // Validate first digit
+        let sum = 0;
+        for (let i = 0; i < 9; i++) {
+            sum += parseInt(cpf.charAt(i)) * (10 - i);
+        }
+        let digit1 = 11 - (sum % 11);
+        if (digit1 > 9) digit1 = 0;
+        if (digit1 !== parseInt(cpf.charAt(9))) return false;
+
+        // Validate second digit
+        sum = 0;
+        for (let i = 0; i < 10; i++) {
+            sum += parseInt(cpf.charAt(i)) * (11 - i);
+        }
+        let digit2 = 11 - (sum % 11);
+        if (digit2 > 9) digit2 = 0;
+        if (digit2 !== parseInt(cpf.charAt(10))) return false;
+
+        return true;
+    }
 </script>
 {% endblock %}
