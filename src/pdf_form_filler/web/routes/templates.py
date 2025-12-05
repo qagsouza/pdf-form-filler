@@ -524,8 +524,9 @@ async def replace_template_pdf(
         except Exception as e:
             print(f"Warning: Could not delete old file: {e}")
 
-        # Save new file with same path
-        new_path = storage_service.get_template_path(template.file_path)
+        # Save new file with same path (construct path directly to avoid FileNotFound)
+        from pathlib import Path
+        new_path = Path(storage_service.base_path) / template.file_path
         new_path.parent.mkdir(parents=True, exist_ok=True)
 
         with open(new_path, 'wb') as f:
