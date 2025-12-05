@@ -396,27 +396,11 @@
                                 </span>
                             </label>
 
-                            <!-- Value Type Selector -->
-                            <div class="mb-2">
-                                <label class="form-label small">Tipo de valor:</label>
-                                <select class="form-select form-select-sm value-type-selector"
-                                        data-field-index="{{ loop.index }}"
-                                        name="value_type_{{ field_name }}">
-                                    <option value="static"
-                                            {% if not template.field_config or not template.field_config.get(field_name) or not template.field_config.get(field_name).get('dynamic_type') %}selected{% endif %}>
-                                        Valor estático
-                                    </option>
-                                    <option value="dynamic"
-                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') %}selected{% endif %}>
-                                        Valor dinâmico
-                                    </option>
-                                </select>
-                            </div>
-
                             <!-- Field Type Selector -->
                             <div class="mb-2">
                                 <label class="form-label small">Tipo de campo:</label>
-                                <select class="form-select form-select-sm"
+                                <select class="form-select form-select-sm field-type-selector"
+                                        data-field-index="{{ loop.index }}"
                                         name="field_type_{{ field_name }}">
                                     <option value="text"
                                             {% if not template.field_config or not template.field_config.get(field_name) or not template.field_config.get(field_name).get('field_type') or template.field_config.get(field_name).get('field_type') == 'text' %}selected{% endif %}>
@@ -444,6 +428,23 @@
                                     </option>
                                 </select>
                                 <small class="form-text text-muted">Define o tipo de input e validação no formulário de preenchimento</small>
+                            </div>
+
+                            <!-- Value Type Selector -->
+                            <div class="mb-2">
+                                <label class="form-label small">Tipo de valor:</label>
+                                <select class="form-select form-select-sm value-type-selector"
+                                        data-field-index="{{ loop.index }}"
+                                        name="value_type_{{ field_name }}">
+                                    <option value="static"
+                                            {% if not template.field_config or not template.field_config.get(field_name) or not template.field_config.get(field_name).get('dynamic_type') %}selected{% endif %}>
+                                        Valor estático
+                                    </option>
+                                    <option value="dynamic"
+                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') %}selected{% endif %}>
+                                        Valor dinâmico
+                                    </option>
+                                </select>
                             </div>
 
                             <!-- Static Value Input -->
@@ -482,41 +483,41 @@
                             <!-- Dynamic Value Selector -->
                             <div class="dynamic-value-container-{{ loop.index }}"
                                  style="{% if not template.field_config or not template.field_config.get(field_name) or not template.field_config.get(field_name).get('dynamic_type') %}display:none;{% endif %}">
-                                <select class="form-select" name="dynamic_type_{{ field_name }}">
+                                <select class="form-select dynamic-type-selector" data-field-index="{{ loop.index }}" name="dynamic_type_{{ field_name }}">
                                     <option value="">-- Selecione um tipo --</option>
-                                    <option value="current_date"
+                                    <option value="current_date" data-compatible-with="date,text"
                                             {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') == 'current_date' %}selected{% endif %}>
                                         📅 Data atual (YYYY-MM-DD)
                                     </option>
-                                    <option value="current_date_br"
+                                    <option value="current_date_br" data-compatible-with="date,text"
                                             {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') == 'current_date_br' %}selected{% endif %}>
                                         📅 Data atual (DD/MM/YYYY)
                                     </option>
-                                    <option value="current_datetime"
+                                    <option value="current_datetime" data-compatible-with="text"
                                             {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') == 'current_datetime' %}selected{% endif %}>
                                         🕐 Data e hora atual
                                     </option>
-                                    <option value="current_time"
+                                    <option value="current_time" data-compatible-with="text"
                                             {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') == 'current_time' %}selected{% endif %}>
                                         🕐 Hora atual
                                     </option>
-                                    <option value="current_year"
+                                    <option value="current_year" data-compatible-with="number,text"
                                             {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') == 'current_year' %}selected{% endif %}>
                                         📅 Ano atual
                                     </option>
-                                    <option value="user_name"
+                                    <option value="user_name" data-compatible-with="text"
                                             {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') == 'user_name' %}selected{% endif %}>
                                         👤 Nome do usuário
                                     </option>
-                                    <option value="user_email"
+                                    <option value="user_email" data-compatible-with="email,text"
                                             {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') == 'user_email' %}selected{% endif %}>
                                         ✉️ Email do usuário
                                     </option>
-                                    <option value="user_username"
+                                    <option value="user_username" data-compatible-with="text"
                                             {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') == 'user_username' %}selected{% endif %}>
                                         👤 Username do usuário
                                     </option>
-                                    <option value="serial_number"
+                                    <option value="serial_number" data-compatible-with="number,text"
                                             {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') == 'serial_number' %}selected{% endif %}>
                                         🔢 Número de série sequencial
                                     </option>
@@ -641,6 +642,47 @@ document.addEventListener('DOMContentLoaded', function() {
                 staticContainer.style.display = 'none';
                 dynamicContainer.style.display = 'block';
             }
+        });
+    });
+
+    // Handle field type selector change - filter dynamic type options
+    const fieldTypeSelectors = document.querySelectorAll('.field-type-selector');
+
+    // Function to filter dynamic type options based on field type
+    function filterDynamicOptions(fieldIndex, fieldType) {
+        const dynamicSelect = document.querySelector(`.dynamic-type-selector[data-field-index="${fieldIndex}"]`);
+        if (!dynamicSelect) return;
+
+        const currentValue = dynamicSelect.value;
+        const options = dynamicSelect.querySelectorAll('option[data-compatible-with]');
+
+        options.forEach(function(option) {
+            const compatibleTypes = option.dataset.compatibleWith.split(',');
+            if (compatibleTypes.includes(fieldType)) {
+                option.style.display = '';
+                option.disabled = false;
+            } else {
+                option.style.display = 'none';
+                option.disabled = true;
+            }
+        });
+
+        // If current selected value is not compatible, reset to empty
+        const currentOption = dynamicSelect.querySelector(`option[value="${currentValue}"]`);
+        if (currentOption && currentOption.disabled) {
+            dynamicSelect.value = '';
+        }
+    }
+
+    fieldTypeSelectors.forEach(function(selector) {
+        const fieldIndex = selector.dataset.fieldIndex;
+
+        // Filter on page load
+        filterDynamicOptions(fieldIndex, selector.value);
+
+        // Filter when field type changes
+        selector.addEventListener('change', function() {
+            filterDynamicOptions(fieldIndex, this.value);
         });
     });
 });
