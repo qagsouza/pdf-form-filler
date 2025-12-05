@@ -65,7 +65,47 @@
                         <i class="bi bi-pencil-square"></i> Preencher Campos
                     </h5>
                 </div>
+
+                <!-- Batch Controls -->
+                <div class="card-body border-bottom bg-light py-2">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                            <span class="badge bg-primary" id="instance-counter">Instância 1 de 1</span>
+                            <span class="badge bg-info ms-1" id="total-instances">Total: 1</span>
+                        </div>
+                        <div class="btn-group btn-group-sm">
+                            <button type="button" class="btn btn-outline-primary" id="btn-prev-instance" disabled>
+                                <i class="bi bi-chevron-left"></i> Anterior
+                            </button>
+                            <button type="button" class="btn btn-outline-primary" id="btn-next-instance">
+                                Próxima <i class="bi bi-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button type="button" class="btn btn-sm btn-success" id="btn-add-instance">
+                            <i class="bi bi-plus-circle"></i> Nova Instância
+                        </button>
+                        <button type="button" class="btn btn-sm btn-warning" id="btn-duplicate-instance">
+                            <i class="bi bi-files"></i> Duplicar
+                        </button>
+                        <button type="button" class="btn btn-sm btn-danger" id="btn-delete-instance">
+                            <i class="bi bi-trash"></i> Excluir
+                        </button>
+                        <div class="ms-auto">
+                            <a href="/templates/{{ template.id }}/download-excel" class="btn btn-sm btn-info">
+                                <i class="bi bi-download"></i> Excel
+                            </a>
+                            <button type="button" class="btn btn-sm btn-info" data-bs-toggle="modal" data-bs-target="#uploadExcelModal">
+                                <i class="bi bi-upload"></i> Importar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <form id="fill-form" method="POST" action="/fill/{{ template.id }}" style="display: flex; flex-direction: column; flex: 1; min-height: 0;">
+                    <input type="hidden" name="batch_data" id="batch-data-input">
+
                     {% if fields %}
                     <div class="card-body" style="overflow-y: auto; flex: 1;">
                         <p class="text-muted mb-3">
@@ -166,6 +206,35 @@
         </div>
     </div>
 </div>
+
+<!-- Upload Excel Modal -->
+<div class="modal fade" id="uploadExcelModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">
+                    <i class="bi bi-upload"></i> Importar Dados do Excel
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <p class="text-muted">
+                    Faça upload de um arquivo Excel (.xlsx) com os dados preenchidos.
+                    O arquivo deve ter o formato gerado pelo botão "Download Excel".
+                </p>
+                <input type="file" class="form-control" id="excel-file-input" accept=".xlsx">
+                <div id="excel-upload-status" class="mt-2"></div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                <button type="button" class="btn btn-primary" id="btn-process-excel">
+                    <i class="bi bi-check-circle"></i> Importar
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 {% endblock %}
 
 {% block extra_head %}
@@ -396,6 +465,214 @@
             currentHighlight = null;
             highlightCtx.clearRect(0, 0, highlightCanvas.width, highlightCanvas.height);
         });
+    });
+
+    // ========================================
+    // Batch Instance Management
+    // ========================================
+
+    let instances = [{}]; // Array of instances, each containing field values
+    let currentInstanceIndex = 0;
+
+    // Initialize first instance with default values
+    function initializeInstances() {
+        const firstInstance = {};
+        document.querySelectorAll('.field-group input, .field-group select, .field-group textarea').forEach(input => {
+            if (input.type === 'checkbox') {
+                firstInstance[input.name] = input.checked;
+            } else {
+                firstInstance[input.name] = input.value;
+            }
+        });
+        instances[0] = firstInstance;
+        updateInstanceDisplay();
+    }
+
+    // Save current form state to current instance
+    function saveCurrentInstance() {
+        const instanceData = {};
+        document.querySelectorAll('.field-group input, .field-group select, .field-group textarea').forEach(input => {
+            if (input.type === 'checkbox') {
+                instanceData[input.name] = input.checked;
+            } else if (input.type === 'hidden') {
+                // Skip hidden fields (they're for locked fields)
+                return;
+            } else {
+                instanceData[input.name] = input.value;
+            }
+        });
+        instances[currentInstanceIndex] = instanceData;
+    }
+
+    // Load instance data into form
+    function loadInstance(index) {
+        if (index < 0 || index >= instances.length) return;
+
+        currentInstanceIndex = index;
+        const instanceData = instances[index];
+
+        document.querySelectorAll('.field-group input, .field-group select, .field-group textarea').forEach(input => {
+            if (input.type === 'hidden') {
+                // Skip hidden fields (they're for locked fields)
+                return;
+            }
+
+            const value = instanceData[input.name];
+            if (input.type === 'checkbox') {
+                input.checked = value || false;
+            } else {
+                input.value = value || '';
+            }
+        });
+
+        updateInstanceDisplay();
+    }
+
+    // Update UI to reflect current instance
+    function updateInstanceDisplay() {
+        document.getElementById('instance-counter').textContent =
+            `Instância ${currentInstanceIndex + 1} de ${instances.length}`;
+        document.getElementById('total-instances').textContent =
+            `Total: ${instances.length}`;
+
+        // Update button states
+        document.getElementById('btn-prev-instance').disabled = currentInstanceIndex === 0;
+        document.getElementById('btn-next-instance').disabled = currentInstanceIndex === instances.length - 1;
+        document.getElementById('btn-delete-instance').disabled = instances.length === 1;
+    }
+
+    // Navigation handlers
+    document.getElementById('btn-prev-instance').addEventListener('click', function() {
+        saveCurrentInstance();
+        loadInstance(currentInstanceIndex - 1);
+    });
+
+    document.getElementById('btn-next-instance').addEventListener('click', function() {
+        saveCurrentInstance();
+        loadInstance(currentInstanceIndex + 1);
+    });
+
+    // Add new instance
+    document.getElementById('btn-add-instance').addEventListener('click', function() {
+        saveCurrentInstance();
+        instances.push({});
+        loadInstance(instances.length - 1);
+    });
+
+    // Duplicate current instance
+    document.getElementById('btn-duplicate-instance').addEventListener('click', function() {
+        saveCurrentInstance();
+        const duplicate = { ...instances[currentInstanceIndex] };
+        instances.push(duplicate);
+        loadInstance(instances.length - 1);
+    });
+
+    // Delete current instance
+    document.getElementById('btn-delete-instance').addEventListener('click', function() {
+        if (instances.length === 1) return;
+
+        if (confirm('Tem certeza que deseja excluir esta instância?')) {
+            instances.splice(currentInstanceIndex, 1);
+            if (currentInstanceIndex >= instances.length) {
+                currentInstanceIndex = instances.length - 1;
+            }
+            loadInstance(currentInstanceIndex);
+        }
+    });
+
+    // Form submission handler
+    document.getElementById('fill-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+
+        // Save current instance
+        saveCurrentInstance();
+
+        // Serialize all instances to hidden input
+        document.getElementById('batch-data-input').value = JSON.stringify(instances);
+
+        // Submit form
+        this.submit();
+    });
+
+    // Initialize on page load
+    initializeInstances();
+
+    // ========================================
+    // Excel Import Handler
+    // ========================================
+
+    // Require SheetJS library for Excel parsing
+    const sheetJsScript = document.createElement('script');
+    sheetJsScript.src = 'https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js';
+    document.head.appendChild(sheetJsScript);
+
+    document.getElementById('btn-process-excel').addEventListener('click', async function() {
+        const fileInput = document.getElementById('excel-file-input');
+        const statusDiv = document.getElementById('excel-upload-status');
+
+        if (!fileInput.files || fileInput.files.length === 0) {
+            statusDiv.innerHTML = '<div class="alert alert-warning">Por favor, selecione um arquivo Excel.</div>';
+            return;
+        }
+
+        const file = fileInput.files[0];
+        statusDiv.innerHTML = '<div class="alert alert-info">Processando arquivo...</div>';
+
+        try {
+            // Wait for XLSX library to load
+            while (typeof XLSX === 'undefined') {
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+
+            const data = await file.arrayBuffer();
+            const workbook = XLSX.read(data);
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(firstSheet);
+
+            if (rows.length === 0) {
+                statusDiv.innerHTML = '<div class="alert alert-warning">O arquivo Excel está vazio.</div>';
+                return;
+            }
+
+            // Clear current instances
+            instances = [];
+
+            // Convert each row to an instance
+            rows.forEach(row => {
+                const instance = {};
+                for (const [key, value] of Object.entries(row)) {
+                    // Skip special columns
+                    if (key.startsWith('_')) continue;
+
+                    // Convert values to appropriate types
+                    if (value === true || value === 'TRUE' || value === 'true' || value === 1) {
+                        instance[key] = true;
+                    } else if (value === false || value === 'FALSE' || value === 'false' || value === 0) {
+                        instance[key] = false;
+                    } else if (value !== null && value !== undefined) {
+                        instance[key] = String(value);
+                    }
+                }
+                instances.push(instance);
+            });
+
+            // Load first instance
+            currentInstanceIndex = 0;
+            loadInstance(0);
+
+            statusDiv.innerHTML = `<div class="alert alert-success">✓ ${instances.length} instância(s) importada(s) com sucesso!</div>`;
+
+            // Close modal after 2 seconds
+            setTimeout(() => {
+                bootstrap.Modal.getInstance(document.getElementById('uploadExcelModal')).hide();
+                statusDiv.innerHTML = '';
+                fileInput.value = '';
+            }, 2000);
+
+        } catch (error) {
+            console.error('Excel import error:', error);
+            statusDiv.innerHTML = `<div class="alert alert-danger">Erro ao processar arquivo: ${error.message}</div>`;
+        }
     });
 </script>
 {% endblock %}

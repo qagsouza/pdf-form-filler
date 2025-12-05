@@ -159,53 +159,109 @@ async def submit_fill_form(
 
         # Parse form data
         form = await http_request.form()
-        data = {}
 
-        for key, val in form.multi_items():
-            if key in ["template_id", "request_name", "request_notes", "send_email", "recipient_email", "recipient_name"]:
-                continue
+        # Check for batch data (multiple instances)
+        batch_data_json = form.get("batch_data")
 
-            # Handle checkboxes (HTML sends 'on' when checked)
-            if val == "on":
-                data[key] = True
-            elif isinstance(val, list):
-                data[key] = val
-            else:
-                # Only add if not empty
-                if val and val.strip():
+        if batch_data_json:
+            # Process multiple instances from batch_data
+            import json
+            instances_data = json.loads(batch_data_json)
+
+            # Resolve dynamic values once
+            from ...services.dynamic_values import DynamicValueResolver
+            dynamic_values = DynamicValueResolver.resolve_template_values(template, current_user)
+
+            # Initialize email service if needed
+            email_service = None
+
+            # Process each instance
+            created_requests = []
+            for instance_data in instances_data:
+                # Merge with dynamic values
+                final_data = DynamicValueResolver.merge_values(
+                    default_values=template.default_values,
+                    dynamic_values=dynamic_values,
+                    user_values=instance_data,
+                    field_config=template.field_config
+                )
+
+                # Create request for this instance
+                request_data = RequestWithData(
+                    template_id=template_id,
+                    name=None,  # Batch instances don't have individual names
+                    notes=f"Instância {len(created_requests) + 1} de {len(instances_data)}",
+                    data=final_data,
+                    recipient_email=None,
+                    recipient_name=None,
+                    send_email=False
+                )
+
+                req = RequestService.create_request_with_instance(
+                    db=db,
+                    user_id=current_user.id,
+                    request_data=request_data,
+                    storage=storage_service,
+                    email_service=None,
+                    send_email=False
+                )
+                created_requests.append(req)
+
+            # Redirect to requests list
+            return RedirectResponse(
+                url=f"/requests?success=batch_created&count={len(created_requests)}",
+                status_code=302
+            )
+
+        else:
+            # Single instance - original logic
+            data = {}
+
+            for key, val in form.multi_items():
+                if key in ["template_id", "request_name", "request_notes", "send_email", "recipient_email", "recipient_name", "batch_data"]:
+                    continue
+
+                # Handle checkboxes (HTML sends 'on' when checked)
+                if val == "on":
+                    data[key] = True
+                elif isinstance(val, list):
                     data[key] = val
+                else:
+                    # Only add if not empty
+                    if val and val.strip():
+                        data[key] = val
 
-        # Resolve dynamic values and merge with user data
-        from ...services.dynamic_values import DynamicValueResolver
-        dynamic_values = DynamicValueResolver.resolve_template_values(template, current_user)
+            # Resolve dynamic values and merge with user data
+            from ...services.dynamic_values import DynamicValueResolver
+            dynamic_values = DynamicValueResolver.resolve_template_values(template, current_user)
 
-        # Merge: dynamic values override user input for locked fields
-        final_data = DynamicValueResolver.merge_values(
-            default_values=template.default_values,
-            dynamic_values=dynamic_values,
-            user_values=data,
-            field_config=template.field_config
-        )
+            # Merge: dynamic values override user input for locked fields
+            final_data = DynamicValueResolver.merge_values(
+                default_values=template.default_values,
+                dynamic_values=dynamic_values,
+                user_values=data,
+                field_config=template.field_config
+            )
 
-        # Get optional fields
-        request_name = form.get("request_name", "").strip() or None
-        request_notes = form.get("request_notes", "").strip() or None
+            # Get optional fields
+            request_name = form.get("request_name", "").strip() or None
+            request_notes = form.get("request_notes", "").strip() or None
 
-        # Get email fields
-        send_email = form.get("send_email") == "on"
-        recipient_email = form.get("recipient_email", "").strip() or None
-        recipient_name = form.get("recipient_name", "").strip() or None
+            # Get email fields
+            send_email = form.get("send_email") == "on"
+            recipient_email = form.get("recipient_email", "").strip() or None
+            recipient_name = form.get("recipient_name", "").strip() or None
 
-        # Create request
-        request_data = RequestWithData(
-            template_id=template_id,
-            name=request_name,
-            notes=request_notes,
-            data=final_data,
-            recipient_email=recipient_email,
-            recipient_name=recipient_name,
-            send_email=send_email
-        )
+            # Create request
+            request_data = RequestWithData(
+                template_id=template_id,
+                name=request_name,
+                notes=request_notes,
+                data=final_data,
+                recipient_email=recipient_email,
+                recipient_name=recipient_name,
+                send_email=send_email
+            )
 
         # Initialize email service if needed
         email_service = None
