@@ -45,6 +45,28 @@
             </div>
             {% endif %}
 
+            <!-- Group Filter -->
+            {% if all_groups %}
+            <div class="card shadow-sm mb-4">
+                <div class="card-body">
+                    <div class="row align-items-center">
+                        <div class="col-auto">
+                            <label class="form-label mb-0"><i class="bi bi-funnel"></i> Filtrar por Grupo:</label>
+                        </div>
+                        <div class="col">
+                            <select class="form-select" id="groupFilter" onchange="filterByGroup()">
+                                <option value="">Todos os grupos</option>
+                                {% for group in all_groups %}
+                                <option value="{{ group.id }}">{{ group.name }}</option>
+                                {% endfor %}
+                                <option value="no_group">Sem grupo</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
             <!-- Owned Templates -->
             <div class="card shadow-sm mb-4">
                 <div class="card-header bg-primary text-white">
@@ -64,6 +86,11 @@
                                     <div class="mb-2">
                                         <span class="badge bg-info">{{ item.field_count }} campos</span>
                                         <span class="badge bg-success">Owner</span>
+                                        {% if item.template.group %}
+                                        <span class="badge bg-secondary">
+                                            <i class="bi bi-people"></i> {{ item.template.group.name }}
+                                        </span>
+                                        {% endif %}
                                     </div>
                                     <p class="card-text small text-muted">
                                         Criado em: {{ item.template.created_at.strftime('%d/%m/%Y %H:%M') }}
@@ -110,6 +137,11 @@
                                     <div class="mb-2">
                                         <span class="badge bg-info">{{ item.field_count }} campos</span>
                                         <span class="badge bg-warning">{{ item.permission|capitalize }}</span>
+                                        {% if item.template.group %}
+                                        <span class="badge bg-secondary">
+                                            <i class="bi bi-people"></i> {{ item.template.group.name }}
+                                        </span>
+                                        {% endif %}
                                     </div>
                                     <p class="card-text small text-muted">
                                         Criado em: {{ item.template.created_at.strftime('%d/%m/%Y %H:%M') }}
@@ -157,6 +189,17 @@
                     </div>
 
                     <div class="mb-3">
+                        <label for="group_id" class="form-label">Grupo (opcional)</label>
+                        <select class="form-select" id="group_id" name="group_id">
+                            <option value="">Nenhum grupo</option>
+                            {% for group in all_groups %}
+                            <option value="{{ group.id }}">{{ group.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Associe este template a um grupo para melhor organização</div>
+                    </div>
+
+                    <div class="mb-3">
                         <label for="file" class="form-label">Arquivo PDF</label>
                         <input type="file" class="form-control" id="file" name="file" accept=".pdf" required>
                         <div class="form-text">Apenas arquivos PDF (máximo 10MB)</div>
@@ -174,4 +217,37 @@
 
 {% block extra_head %}
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+<script>
+function filterByGroup() {
+    const selectedGroup = document.getElementById('groupFilter').value;
+    const cards = document.querySelectorAll('.col-md-6.col-lg-4.mb-3');
+
+    cards.forEach(card => {
+        const groupBadge = card.querySelector('.badge.bg-secondary');
+        const cardGroupName = groupBadge ? groupBadge.textContent.trim().replace(/^\s*[\s\S]*?\s+/, '') : null;
+
+        if (!selectedGroup) {
+            // Show all cards
+            card.style.display = '';
+        } else if (selectedGroup === 'no_group') {
+            // Show only cards without group
+            if (!groupBadge) {
+                card.style.display = '';
+            } else {
+                card.style.display = 'none';
+            }
+        } else {
+            // Find the group name from the select option
+            const selectOption = document.querySelector(`#groupFilter option[value="${selectedGroup}"]`);
+            const selectedGroupName = selectOption ? selectOption.textContent : '';
+
+            if (cardGroupName && cardGroupName.includes(selectedGroupName)) {
+                card.style.display = '';
+            } else {
+                card.style.display = 'none';
+            }
+        }
+    });
+}
+</script>
 {% endblock %}

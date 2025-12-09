@@ -42,6 +42,13 @@
             </div>
             {% endif %}
 
+            {% if request.query_params.get('success') == 'field_configured' %}
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle"></i> Configuração do campo salva com sucesso!
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
             {% if request.query_params.get('success') == 'pdf_replaced' %}
             <div class="alert alert-success alert-dismissible fade show" role="alert">
                 <i class="bi bi-check-circle"></i> <strong>PDF substituído com sucesso!</strong><br>
@@ -88,6 +95,34 @@
             {% if request.query_params.get('error') == 'replace_failed' %}
             <div class="alert alert-danger alert-dismissible fade show" role="alert">
                 <i class="bi bi-exclamation-triangle"></i> Falha ao substituir PDF. Tente novamente.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            {% if request.query_params.get('success') == 'ownership_transferred' %}
+            <div class="alert alert-success alert-dismissible fade show" role="alert">
+                <i class="bi bi-check-circle"></i> Propriedade do template transferida com sucesso!
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            {% if request.query_params.get('error') == 'user_not_found' %}
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle"></i> Usuário não encontrado. Verifique o username e tente novamente.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            {% if request.query_params.get('error') == 'already_owner' %}
+            <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                <i class="bi bi-info-circle"></i> Este usuário já é o proprietário do template.
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+            {% endif %}
+
+            {% if request.query_params.get('error') == 'transfer_failed' %}
+            <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                <i class="bi bi-exclamation-triangle"></i> Falha ao transferir propriedade. Tente novamente.
                 <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
             </div>
             {% endif %}
@@ -165,11 +200,6 @@
                                 <a href="/templates/{{ template.id }}/fill-inline" class="btn btn-success">
                                     <i class="bi bi-file-earmark-pdf"></i> Preencher no Navegador
                                 </a>
-                                {% if is_owner or permission in ['admin', 'editor'] %}
-                                <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#defaultValuesModal">
-                                    <i class="bi bi-pencil-square"></i> Propriedades dos Campos
-                                </button>
-                                {% endif %}
                                 <a href="/batch/{{ template.id }}" class="btn btn-info">
                                     <i class="bi bi-file-earmark-spreadsheet"></i> Preenchimento em Lote
                                 </a>
@@ -190,56 +220,16 @@
                 </div>
             </div>
 
-            <!-- Fields -->
-            <div class="card shadow-sm mb-4">
-                <div class="card-header">
-                    <h5 class="mb-0">Campos do Formulário ({{ field_count }})</h5>
-                </div>
-                <div class="card-body">
-                    {% if fields %}
-                    <div class="table-responsive">
-                        <table class="table table-hover">
-                            <thead>
-                                <tr>
-                                    <th>Nome do Campo</th>
-                                    <th>Tipo</th>
-                                    <th>Página</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for field_name, field_info in fields.items() %}
-                                <tr>
-                                    <td><code>{{ field_name }}</code></td>
-                                    <td>
-                                        {% if field_info.type == 'text' %}
-                                            <span class="badge bg-primary">Texto</span>
-                                        {% elif field_info.type == 'button' %}
-                                            <span class="badge bg-success">Botão/Checkbox</span>
-                                        {% elif field_info.type == 'choice' %}
-                                            <span class="badge bg-info">Escolha</span>
-                                        {% else %}
-                                            <span class="badge bg-secondary">{{ field_info.type }}</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>{{ field_info.page + 1 }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
-                    {% else %}
-                    <div class="alert alert-info">
-                        Nenhum campo detectado neste PDF.
-                    </div>
-                    {% endif %}
-                </div>
-            </div>
-
             <!-- Sharing (Only for owner/admin) -->
             {% if shares is not none %}
-            <div class="card shadow-sm">
-                <div class="card-header">
+            <div class="card shadow-sm mb-4">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h5 class="mb-0">Compartilhamento ({{ shares|length }})</h5>
+                    {% if permission in ['owner', 'admin'] %}
+                    <button type="button" class="btn btn-sm btn-warning" data-bs-toggle="modal" data-bs-target="#transferOwnershipModal">
+                        <i class="bi bi-arrow-left-right"></i> Transferir Propriedade
+                    </button>
+                    {% endif %}
                 </div>
                 <div class="card-body">
                     {% if shares %}
@@ -247,8 +237,9 @@
                         <table class="table table-hover">
                             <thead>
                                 <tr>
-                                    <th>Usuário</th>
-                                    <th>Email</th>
+                                    <th>Tipo</th>
+                                    <th>Nome</th>
+                                    <th>Detalhes</th>
                                     <th>Permissão</th>
                                     <th>Compartilhado em</th>
                                     <th>Ações</th>
@@ -257,8 +248,27 @@
                             <tbody>
                                 {% for item in shares %}
                                 <tr>
-                                    <td>{{ item.user.full_name if item.user else 'Usuário desconhecido' }}</td>
-                                    <td>{{ item.user.email if item.user else '-' }}</td>
+                                    <td>
+                                        {% if item.type == 'user' %}
+                                            <i class="bi bi-person-fill text-primary"></i> Usuário
+                                        {% else %}
+                                            <i class="bi bi-people-fill text-success"></i> Grupo
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if item.type == 'user' %}
+                                            {{ item.user.full_name if item.user else 'Usuário desconhecido' }}
+                                        {% else %}
+                                            {{ item.group.name if item.group else 'Grupo desconhecido' }}
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if item.type == 'user' %}
+                                            {{ item.user.email if item.user else '-' }}
+                                        {% else %}
+                                            {{ item.group.members|length }} membros
+                                        {% endif %}
+                                    </td>
                                     <td>
                                         {% if item.share.permission.value == 'admin' %}
                                             <span class="badge bg-danger">Admin</span>
@@ -291,6 +301,65 @@
                 </div>
             </div>
             {% endif %}
+
+            <!-- Fields -->
+            <div class="card shadow-sm mb-4">
+                <div class="card-header">
+                    <h5 class="mb-0">Campos do Formulário ({{ field_count }})</h5>
+                </div>
+                <div class="card-body">
+                    {% if fields %}
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Descrição</th>
+                                    <th>Nome do Campo</th>
+                                    <th>Tipo</th>
+                                    <th>Página</th>
+                                    {% if is_owner or permission in ['admin', 'editor'] %}
+                                    <th>Ações</th>
+                                    {% endif %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for field_name, field_info in fields.items() %}
+                                <tr>
+                                    <td>{{ field_info.label if field_info.label else '-' }}</td>
+                                    <td><code>{{ field_name }}</code></td>
+                                    <td>
+                                        {% if field_info.type == 'text' %}
+                                            <span class="badge bg-primary">Texto</span>
+                                        {% elif field_info.type == 'button' %}
+                                            <span class="badge bg-success">Botão/Checkbox</span>
+                                        {% elif field_info.type == 'choice' %}
+                                            <span class="badge bg-info">Escolha</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary">{{ field_info.type }}</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ field_info.page + 1 }}</td>
+                                    {% if is_owner or permission in ['admin', 'editor'] %}
+                                    <td>
+                                        <button type="button"
+                                                class="btn btn-sm btn-outline-primary"
+                                                onclick="openFieldConfigModal('{{ field_name }}')">
+                                            <i class="bi bi-gear"></i> Configurar
+                                        </button>
+                                    </td>
+                                    {% endif %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="alert alert-info">
+                        Nenhum campo detectado neste PDF.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
         </div>
     </div>
 </div>
@@ -314,6 +383,19 @@
                     <div class="mb-3">
                         <label for="edit_description" class="form-label">Descrição</label>
                         <textarea class="form-control" id="edit_description" name="description" rows="3">{{ template.description or '' }}</textarea>
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="edit_group_id" class="form-label">Grupo (opcional)</label>
+                        <select class="form-select" id="edit_group_id" name="group_id">
+                            <option value="">Nenhum grupo</option>
+                            {% for group in all_groups %}
+                            <option value="{{ group.id }}" {% if template.group_id == group.id %}selected{% endif %}>
+                                {{ group.name }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <div class="form-text">Associe este template a um grupo para melhor organização</div>
                     </div>
 
                     <hr class="my-4">
@@ -396,9 +478,39 @@ document.getElementById('pdf_file_edit').addEventListener('change', function(e) 
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label for="user_email" class="form-label">Email do Usuário</label>
-                        <input type="email" class="form-control" id="user_email" name="user_email" required>
-                        <div class="form-text">Digite o email do usuário com quem deseja compartilhar</div>
+                        <label class="form-label">Compartilhar com:</label>
+                        <div class="btn-group w-100" role="group">
+                            <input type="radio" class="btn-check" name="share_type" id="share_user" value="user" checked autocomplete="off">
+                            <label class="btn btn-outline-primary" for="share_user">
+                                <i class="bi bi-person"></i> Usuário
+                            </label>
+
+                            <input type="radio" class="btn-check" name="share_type" id="share_group" value="group" autocomplete="off">
+                            <label class="btn btn-outline-primary" for="share_group">
+                                <i class="bi bi-people-fill"></i> Grupo
+                            </label>
+                        </div>
+                    </div>
+
+                    <div id="user_share_section">
+                        <div class="mb-3">
+                            <label for="user_email" class="form-label">Email do Usuário</label>
+                            <input type="email" class="form-control" id="user_email" name="user_email">
+                            <div class="form-text">Digite o email do usuário com quem deseja compartilhar</div>
+                        </div>
+                    </div>
+
+                    <div id="group_share_section" style="display: none;">
+                        <div class="mb-3">
+                            <label for="group_id" class="form-label">Selecione o Grupo</label>
+                            <select class="form-select" id="group_id" name="group_id">
+                                <option value="">Selecione um grupo...</option>
+                                {% for group in all_groups %}
+                                <option value="{{ group.id }}">{{ group.name }} ({{ group.members|length }} membros)</option>
+                                {% endfor %}
+                            </select>
+                            <div class="form-text">Escolha o grupo com quem deseja compartilhar</div>
+                        </div>
                     </div>
 
                     <div class="mb-3">
@@ -418,203 +530,32 @@ document.getElementById('pdf_file_edit').addEventListener('change', function(e) 
         </div>
     </div>
 </div>
+
+<script>
+// Toggle between user and group share sections
+document.querySelectorAll('input[name="share_type"]').forEach(function(radio) {
+    radio.addEventListener('change', function() {
+        const userSection = document.getElementById('user_share_section');
+        const groupSection = document.getElementById('group_share_section');
+        const userEmailInput = document.getElementById('user_email');
+        const groupIdInput = document.getElementById('group_id');
+
+        if (this.value === 'user') {
+            userSection.style.display = 'block';
+            groupSection.style.display = 'none';
+            userEmailInput.required = true;
+            groupIdInput.required = false;
+        } else {
+            userSection.style.display = 'none';
+            groupSection.style.display = 'block';
+            userEmailInput.required = false;
+            groupIdInput.required = true;
+        }
+    });
+});
+</script>
 {% endif %}
 
-<!-- Default Values Modal -->
-{% if is_owner or permission in ['admin', 'editor'] %}
-<div class="modal fade" id="defaultValuesModal" tabindex="-1" aria-labelledby="defaultValuesModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-            <form method="POST" action="/templates/{{ template.id }}/default-values">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="defaultValuesModalLabel">
-                        <i class="bi bi-pencil-square"></i> Configurar Propriedades dos Campos
-                    </h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <p class="text-muted mb-3">
-                        <i class="bi bi-info-circle"></i> Defina valores padrão para os campos do formulário.
-                        Estes valores serão automaticamente preenchidos ao iniciar um novo preenchimento.
-                        <br><strong>Valores dinâmicos:</strong> São calculados automaticamente (ex: data atual, nome do usuário).
-                        <br><strong>Campos travados:</strong> Não podem ser editados pelos usuários ao preencher o formulário.
-                    </p>
-
-                    {% if fields %}
-                    <div style="max-height: 500px; overflow-y: auto;">
-                        {% for field_name, field_info in fields.items() %}
-                        <div class="mb-4 border-bottom pb-3">
-                            <label class="form-label">
-                                <strong>{{ field_info.label if field_info.label else field_name }}</strong>
-                                {% if field_info.label %}
-                                <span class="badge bg-info ms-1" style="font-size: 0.65em;">{{ field_name }}</span>
-                                {% endif %}
-                                <span class="badge bg-secondary ms-2" style="font-size: 0.7em;">
-                                    Pág. {{ field_info.page + 1 }}
-                                </span>
-                            </label>
-
-                            <!-- Field Type Selector -->
-                            <div class="mb-2">
-                                <label class="form-label small">Tipo de campo:</label>
-                                <select class="form-select form-select-sm field-type-selector"
-                                        data-field-index="{{ loop.index }}"
-                                        name="field_type_{{ field_name }}">
-                                    <option value="text"
-                                            {% if not template.field_config or not template.field_config.get(field_name) or not template.field_config.get(field_name).get('field_type') or template.field_config.get(field_name).get('field_type') == 'text' %}selected{% endif %}>
-                                        📝 Texto
-                                    </option>
-                                    <option value="number"
-                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('field_type') == 'number' %}selected{% endif %}>
-                                        🔢 Número
-                                    </option>
-                                    <option value="date"
-                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('field_type') == 'date' %}selected{% endif %}>
-                                        📅 Data
-                                    </option>
-                                    <option value="email"
-                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('field_type') == 'email' %}selected{% endif %}>
-                                        ✉️ Email
-                                    </option>
-                                    <option value="tel"
-                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('field_type') == 'tel' %}selected{% endif %}>
-                                        📞 Telefone
-                                    </option>
-                                    <option value="url"
-                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('field_type') == 'url' %}selected{% endif %}>
-                                        🔗 URL
-                                    </option>
-                                    <option value="cpf"
-                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('field_type') == 'cpf' %}selected{% endif %}>
-                                        🆔 CPF
-                                    </option>
-                                </select>
-                                <small class="form-text text-muted">Define o tipo de input e validação no formulário de preenchimento</small>
-                            </div>
-
-                            <!-- Value Type Selector -->
-                            <div class="mb-2">
-                                <label class="form-label small">Tipo de valor:</label>
-                                <select class="form-select form-select-sm value-type-selector"
-                                        data-field-index="{{ loop.index }}"
-                                        name="value_type_{{ field_name }}">
-                                    <option value="static"
-                                            {% if not template.field_config or not template.field_config.get(field_name) or not template.field_config.get(field_name).get('dynamic_type') %}selected{% endif %}>
-                                        Valor estático
-                                    </option>
-                                    <option value="dynamic"
-                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') %}selected{% endif %}>
-                                        Valor dinâmico
-                                    </option>
-                                </select>
-                            </div>
-
-                            <!-- Static Value Input -->
-                            <div class="static-value-container-{{ loop.index }}"
-                                 style="{% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') %}display:none;{% endif %}">
-                                {% if field_info.type == 'button' %}
-                                    <div class="form-check">
-                                        <input class="form-check-input" type="checkbox"
-                                               id="default_{{ loop.index }}"
-                                               name="default_{{ field_name }}"
-                                               value="on"
-                                               {% if template.default_values and template.default_values.get(field_name) %}checked{% endif %}>
-                                        <label class="form-check-label" for="default_{{ loop.index }}">
-                                            Marcar por padrão
-                                        </label>
-                                    </div>
-                                {% elif field_info.type == 'choice' and field_info.options %}
-                                    <select class="form-select" id="default_{{ loop.index }}" name="default_{{ field_name }}">
-                                        <option value="">-- Sem valor padrão --</option>
-                                        {% for option in field_info.options %}
-                                        <option value="{{ option }}"
-                                                {% if template.default_values and template.default_values.get(field_name) == option %}selected{% endif %}>
-                                            {{ option }}
-                                        </option>
-                                        {% endfor %}
-                                    </select>
-                                {% else %}
-                                    <input type="text" class="form-control"
-                                           id="default_{{ loop.index }}"
-                                           name="default_{{ field_name }}"
-                                           value="{{ template.default_values.get(field_name, '') if template.default_values else '' }}"
-                                           placeholder="Deixe vazio para nenhum valor padrão">
-                                {% endif %}
-                            </div>
-
-                            <!-- Dynamic Value Selector -->
-                            <div class="dynamic-value-container-{{ loop.index }}"
-                                 style="{% if not template.field_config or not template.field_config.get(field_name) or not template.field_config.get(field_name).get('dynamic_type') %}display:none;{% endif %}">
-                                <select class="form-select dynamic-type-selector" data-field-index="{{ loop.index }}" name="dynamic_type_{{ field_name }}">
-                                    <option value="">-- Selecione um tipo --</option>
-                                    <option value="current_date" data-compatible-with="date,text"
-                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') == 'current_date' %}selected{% endif %}>
-                                        📅 Data atual (YYYY-MM-DD)
-                                    </option>
-                                    <option value="current_date_br" data-compatible-with="date,text"
-                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') == 'current_date_br' %}selected{% endif %}>
-                                        📅 Data atual (DD/MM/YYYY)
-                                    </option>
-                                    <option value="current_datetime" data-compatible-with="text"
-                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') == 'current_datetime' %}selected{% endif %}>
-                                        🕐 Data e hora atual
-                                    </option>
-                                    <option value="current_time" data-compatible-with="text"
-                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') == 'current_time' %}selected{% endif %}>
-                                        🕐 Hora atual
-                                    </option>
-                                    <option value="current_year" data-compatible-with="number,text"
-                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') == 'current_year' %}selected{% endif %}>
-                                        📅 Ano atual
-                                    </option>
-                                    <option value="user_name" data-compatible-with="text"
-                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') == 'user_name' %}selected{% endif %}>
-                                        👤 Nome do usuário
-                                    </option>
-                                    <option value="user_email" data-compatible-with="email,text"
-                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') == 'user_email' %}selected{% endif %}>
-                                        ✉️ Email do usuário
-                                    </option>
-                                    <option value="user_username" data-compatible-with="text"
-                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') == 'user_username' %}selected{% endif %}>
-                                        👤 Username do usuário
-                                    </option>
-                                    <option value="serial_number" data-compatible-with="number,text"
-                                            {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('dynamic_type') == 'serial_number' %}selected{% endif %}>
-                                        🔢 Número de série sequencial
-                                    </option>
-                                </select>
-                            </div>
-
-                            <!-- Lock Field Checkbox -->
-                            <div class="form-check mt-2">
-                                <input class="form-check-input" type="checkbox"
-                                       id="locked_{{ loop.index }}"
-                                       name="locked_{{ field_name }}"
-                                       value="true"
-                                       {% if template.field_config and template.field_config.get(field_name) and template.field_config.get(field_name).get('locked') %}checked{% endif %}>
-                                <label class="form-check-label small text-muted" for="locked_{{ loop.index }}">
-                                    🔒 Travar campo (não editável no preenchimento)
-                                </label>
-                            </div>
-                        </div>
-                        {% endfor %}
-                    </div>
-                    {% else %}
-                    <div class="alert alert-warning">
-                        Este template não possui campos configurados.
-                    </div>
-                    {% endif %}
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
-                    <button type="submit" class="btn btn-primary">Salvar Propriedades</button>
-                </div>
-            </form>
-        </div>
-    </div>
-</div>
-{% endif %}
 
 <!-- Delete Template Modal -->
 {% if is_owner %}
@@ -651,6 +592,128 @@ document.getElementById('pdf_file_edit').addEventListener('change', function(e) 
         </div>
     </div>
 </div>
+
+<!-- Single Field Configuration Modal -->
+{% if is_owner or permission in ['admin', 'editor'] %}
+<div class="modal fade" id="singleFieldConfigModal" tabindex="-1" aria-labelledby="fieldConfigModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="/templates/{{ template.id }}/configure-field">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="fieldConfigModalLabel">
+                        <i class="bi bi-gear"></i> Configurar Campo
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <input type="hidden" id="config_field_name" name="field_name">
+
+                    <div class="mb-3">
+                        <label for="config_field_type" class="form-label">Tipo de campo:</label>
+                        <select class="form-select" id="config_field_type" name="field_type">
+                            <option value="text">📝 Texto</option>
+                            <option value="number">🔢 Número</option>
+                            <option value="date">📅 Data</option>
+                            <option value="email">📧 Email</option>
+                            <option value="tel">📞 Telefone</option>
+                            <option value="url">🔗 URL</option>
+                            <option value="cpf">🆔 CPF</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <div class="form-check form-switch">
+                            <input class="form-check-input" type="checkbox" id="config_is_dynamic" name="is_dynamic">
+                            <label class="form-check-label" for="config_is_dynamic">
+                                Usar valor dinâmico
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="mb-3" id="config_default_value_div">
+                        <label for="config_default_value" class="form-label">Valor padrão:</label>
+                        <input type="text" class="form-control" id="config_default_value" name="default_value">
+                    </div>
+
+                    <div class="mb-3" id="config_dynamic_type_div" style="display:none;">
+                        <label for="config_dynamic_type" class="form-label">Tipo de valor dinâmico:</label>
+                        <select class="form-select" id="config_dynamic_type" name="dynamic_type">
+                            <option value="current_date">📅 Data atual (YYYY-MM-DD)</option>
+                            <option value="current_date_br">📅 Data atual (DD/MM/YYYY)</option>
+                            <option value="current_datetime">🕐 Data e hora atual</option>
+                            <option value="current_time">⏰ Hora atual</option>
+                            <option value="current_year">📆 Ano atual</option>
+                            <option value="user_name">👤 Nome do usuário</option>
+                            <option value="user_email">📧 Email do usuário</option>
+                            <option value="user_username">🔑 Username do usuário</option>
+                            <option value="serial_number">🔢 Número sequencial</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save"></i> Salvar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Transfer Ownership Modal -->
+<div class="modal fade" id="transferOwnershipModal" tabindex="-1" aria-labelledby="transferOwnershipModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form method="POST" action="/templates/{{ template.id }}/transfer-ownership" onsubmit="return confirm('Tem certeza que deseja transferir a propriedade deste template? Você se tornará um admin compartilhado.')">
+                <div class="modal-header bg-warning">
+                    <h5 class="modal-title" id="transferOwnershipModalLabel">
+                        <i class="bi bi-arrow-left-right"></i> Transferir Propriedade
+                    </h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-warning">
+                        <strong>Atenção:</strong> Ao transferir a propriedade, você deixará de ser o dono do template.
+                        Você receberá permissão de <strong>admin</strong> para continuar gerenciando o template.
+                    </div>
+
+                    <div class="mb-3">
+                        <label for="new_owner_username" class="form-label">Username do Novo Proprietário</label>
+                        <input type="text"
+                               class="form-control"
+                               id="new_owner_username"
+                               name="new_owner_username"
+                               list="usernames_list"
+                               autocomplete="off"
+                               required>
+                        <datalist id="usernames_list">
+                            <!-- Will be populated dynamically -->
+                        </datalist>
+                        <div class="form-text">Digite ou selecione o username do usuário que se tornará o novo proprietário</div>
+                    </div>
+
+                    <div class="alert alert-info">
+                        <strong>O que acontecerá:</strong>
+                        <ul class="mb-0 mt-2">
+                            <li>O novo proprietário terá controle total sobre o template</li>
+                            <li>Você receberá permissão de admin (pode gerenciar compartilhamentos)</li>
+                            <li>Todos os compartilhamentos existentes serão mantidos</li>
+                            <li>Esta ação pode ser revertida pelo novo proprietário</li>
+                        </ul>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="submit" class="btn btn-warning">
+                        <i class="bi bi-arrow-left-right"></i> Transferir Propriedade
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
 {% endif %}
 
 {% endblock %}
@@ -661,65 +724,112 @@ document.getElementById('pdf_file_edit').addEventListener('change', function(e) 
 
 {% block extra_scripts %}
 <script>
-// Handle value type selector change
 document.addEventListener('DOMContentLoaded', function() {
-    const valueTypeSelectors = document.querySelectorAll('.value-type-selector');
+    // Autocomplete for username in transfer ownership modal
+    const usernameInput = document.getElementById('new_owner_username');
+    const datalist = document.getElementById('usernames_list');
+    let debounceTimer;
 
-    valueTypeSelectors.forEach(function(selector) {
-        selector.addEventListener('change', function() {
-            const fieldIndex = this.dataset.fieldIndex;
-            const staticContainer = document.querySelector(`.static-value-container-${fieldIndex}`);
-            const dynamicContainer = document.querySelector(`.dynamic-value-container-${fieldIndex}`);
+    if (usernameInput) {
+        usernameInput.addEventListener('input', function() {
+            clearTimeout(debounceTimer);
+            const query = this.value;
 
-            if (this.value === 'static') {
-                staticContainer.style.display = 'block';
-                dynamicContainer.style.display = 'none';
-            } else {
-                staticContainer.style.display = 'none';
-                dynamicContainer.style.display = 'block';
+            if (query.length < 2) {
+                datalist.innerHTML = '';
+                return;
             }
+
+            debounceTimer = setTimeout(async () => {
+                try {
+                    const response = await fetch(`/api/users/search?q=${encodeURIComponent(query)}`);
+                    const data = await response.json();
+
+                    datalist.innerHTML = '';
+                    data.users.forEach(user => {
+                        const option = document.createElement('option');
+                        option.value = user.username;
+                        option.textContent = `${user.username} - ${user.full_name}`;
+                        datalist.appendChild(option);
+                    });
+                } catch (error) {
+                    console.error('Error fetching users:', error);
+                }
+            }, 300); // Wait 300ms after user stops typing
         });
-    });
-
-    // Handle field type selector change - filter dynamic type options
-    const fieldTypeSelectors = document.querySelectorAll('.field-type-selector');
-
-    // Function to filter dynamic type options based on field type
-    function filterDynamicOptions(fieldIndex, fieldType) {
-        const dynamicSelect = document.querySelector(`.dynamic-type-selector[data-field-index="${fieldIndex}"]`);
-        if (!dynamicSelect) return;
-
-        const currentValue = dynamicSelect.value;
-        const options = dynamicSelect.querySelectorAll('option[data-compatible-with]');
-
-        options.forEach(function(option) {
-            const compatibleTypes = option.dataset.compatibleWith.split(',');
-            if (compatibleTypes.includes(fieldType)) {
-                option.style.display = '';
-                option.disabled = false;
-            } else {
-                option.style.display = 'none';
-                option.disabled = true;
-            }
-        });
-
-        // If current selected value is not compatible, reset to empty
-        const currentOption = dynamicSelect.querySelector(`option[value="${currentValue}"]`);
-        if (currentOption && currentOption.disabled) {
-            dynamicSelect.value = '';
-        }
     }
 
-    fieldTypeSelectors.forEach(function(selector) {
-        const fieldIndex = selector.dataset.fieldIndex;
+    // Field configuration modal
+    window.openFieldConfigModal = function(fieldName) {
+        console.log('Opening modal for field:', fieldName);
 
-        // Filter on page load
-        filterDynamicOptions(fieldIndex, selector.value);
+        const modalElement = document.getElementById('singleFieldConfigModal');
+        if (!modalElement) {
+            console.error('Modal element not found!');
+            return;
+        }
 
-        // Filter when field type changes
-        selector.addEventListener('change', function() {
-            filterDynamicOptions(fieldIndex, this.value);
-        });
+        const modal = new bootstrap.Modal(modalElement);
+
+        // Update modal title
+        const titleElement = document.getElementById('fieldConfigModalLabel');
+        if (titleElement) {
+            titleElement.innerHTML = `<i class="bi bi-gear"></i> Configurar Campo: <code>${fieldName}</code>`;
+        }
+
+        // Set field name in hidden input
+        const fieldNameInput = document.getElementById('config_field_name');
+        if (fieldNameInput) {
+            fieldNameInput.value = fieldName;
+        }
+
+        // Get current config
+        const fieldConfig = {{ template.field_config|tojson|safe }} || {};
+        const config = fieldConfig[fieldName] || {};
+
+        // Set field type
+        const fieldTypeSelect = document.getElementById('config_field_type');
+        if (fieldTypeSelect) {
+            fieldTypeSelect.value = config.field_type || 'text';
+        }
+
+        // Set default value
+        const defaultValues = {{ template.default_values|tojson|safe }} || {};
+        const defaultValueInput = document.getElementById('config_default_value');
+        if (defaultValueInput) {
+            defaultValueInput.value = defaultValues[fieldName] || '';
+        }
+
+        // Set dynamic type
+        const dynamicTypeSelect = document.getElementById('config_dynamic_type');
+        const isDynamicCheckbox = document.getElementById('config_is_dynamic');
+        const defaultValueDiv = document.getElementById('config_default_value_div');
+        const dynamicTypeDiv = document.getElementById('config_dynamic_type_div');
+
+        if (config.dynamic_type) {
+            if (isDynamicCheckbox) isDynamicCheckbox.checked = true;
+            if (dynamicTypeSelect) dynamicTypeSelect.value = config.dynamic_type;
+            if (defaultValueDiv) defaultValueDiv.style.display = 'none';
+            if (dynamicTypeDiv) dynamicTypeDiv.style.display = 'block';
+        } else {
+            if (isDynamicCheckbox) isDynamicCheckbox.checked = false;
+            if (defaultValueDiv) defaultValueDiv.style.display = 'block';
+            if (dynamicTypeDiv) dynamicTypeDiv.style.display = 'none';
+        }
+
+        console.log('Showing modal...');
+        modal.show();
+    };
+
+    // Toggle between default value and dynamic type
+    document.getElementById('config_is_dynamic')?.addEventListener('change', function() {
+        if (this.checked) {
+            document.getElementById('config_default_value_div').style.display = 'none';
+            document.getElementById('config_dynamic_type_div').style.display = 'block';
+        } else {
+            document.getElementById('config_default_value_div').style.display = 'block';
+            document.getElementById('config_dynamic_type_div').style.display = 'none';
+        }
     });
 });
 </script>

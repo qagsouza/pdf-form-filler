@@ -79,6 +79,7 @@ class TemplateService:
                 name=template_data.name,
                 description=template_data.description,
                 owner_id=user_id,
+                group_id=template_data.group_id,
                 file_path=file_path,
                 original_filename=file.filename,
                 fields_metadata=fields,
@@ -88,6 +89,33 @@ class TemplateService:
             db.add(template)
             db.commit()
             db.refresh(template)
+
+            # Auto-share with group if group_id is provided
+            if template_data.group_id:
+                try:
+                    from ..models.group import Group
+                    group = db.query(Group).filter(Group.id == template_data.group_id).first()
+                    if group:
+                        # Check if not already shared
+                        existing_share = db.query(TemplateShare).filter(
+                            TemplateShare.template_id == template_id,
+                            TemplateShare.group_id == template_data.group_id
+                        ).first()
+
+                        if not existing_share:
+                            # Create share with editor permission by default
+                            share = TemplateShare(
+                                id=str(uuid.uuid4()),
+                                template_id=template_id,
+                                group_id=template_data.group_id,
+                                shared_by_id=user_id,
+                                permission=PermissionLevel.EDITOR
+                            )
+                            db.add(share)
+                            db.commit()
+                except Exception as e:
+                    # Log but don't fail template creation if sharing fails
+                    print(f"Warning: Failed to auto-share template with group: {e}")
 
             return template
 
@@ -141,7 +169,8 @@ class TemplateService:
     @staticmethod
     def get_shared_templates(db: Session, user_id: str) -> List[Template]:
         """
-        Get templates shared with user
+        Get templates shared with user (directly or via groups)
+        Excludes templates owned by the user
 
         Args:
             db: Database session
@@ -150,14 +179,33 @@ class TemplateService:
         Returns:
             List of shared templates
         """
-        # Get template IDs shared with user
-        shares = db.query(TemplateShare).filter(TemplateShare.user_id == user_id).all()
-        template_ids = [share.template_id for share in shares]
+        from ..models.group import GroupMember
+
+        template_ids = set()
+
+        # Get template IDs shared directly with user
+        direct_shares = db.query(TemplateShare).filter(TemplateShare.user_id == user_id).all()
+        template_ids.update([share.template_id for share in direct_shares])
+
+        # Get user's groups
+        group_memberships = db.query(GroupMember).filter(GroupMember.user_id == user_id).all()
+        group_ids = [gm.group_id for gm in group_memberships]
+
+        # Get template IDs shared with user's groups
+        if group_ids:
+            group_shares = db.query(TemplateShare).filter(
+                TemplateShare.group_id.in_(group_ids)
+            ).all()
+            template_ids.update([share.template_id for share in group_shares])
 
         if not template_ids:
             return []
 
-        return db.query(Template).filter(Template.id.in_(template_ids)).all()
+        # Exclude templates owned by the user
+        return db.query(Template).filter(
+            Template.id.in_(template_ids),
+            Template.owner_id != user_id
+        ).all()
 
     @staticmethod
     def get_all_accessible_templates(db: Session, user_id: str) -> List[Template]:
@@ -216,14 +264,60 @@ class TemplateService:
             return None
 
         try:
+            # Track if group changed
+            old_group_id = template.group_id
+            new_group_id = None
+
             # Update fields
             if template_data.name is not None:
                 template.name = template_data.name
             if template_data.description is not None:
                 template.description = template_data.description
+            if hasattr(template_data, 'group_id'):
+                new_group_id = template_data.group_id
+                template.group_id = new_group_id
 
             db.commit()
             db.refresh(template)
+
+            # Handle group sharing changes
+            if hasattr(template_data, 'group_id') and old_group_id != new_group_id:
+                try:
+                    # Remove old group share if group was changed or removed
+                    if old_group_id:
+                        old_share = db.query(TemplateShare).filter(
+                            TemplateShare.template_id == template_id,
+                            TemplateShare.group_id == old_group_id
+                        ).first()
+                        if old_share:
+                            db.delete(old_share)
+                            db.commit()
+
+                    # Add new group share if group was set
+                    if new_group_id:
+                        from ..models.group import Group
+                        group = db.query(Group).filter(Group.id == new_group_id).first()
+                        if group:
+                            # Check if not already shared
+                            existing_share = db.query(TemplateShare).filter(
+                                TemplateShare.template_id == template_id,
+                                TemplateShare.group_id == new_group_id
+                            ).first()
+
+                            if not existing_share:
+                                # Create share with editor permission by default
+                                share = TemplateShare(
+                                    id=str(uuid.uuid4()),
+                                    template_id=template_id,
+                                    group_id=new_group_id,
+                                    shared_by_id=user_id,
+                                    permission=PermissionLevel.EDITOR
+                                )
+                                db.add(share)
+                                db.commit()
+                except Exception as e:
+                    # Log but don't fail template update if sharing fails
+                    print(f"Warning: Failed to update group sharing: {e}")
 
             return template
 
@@ -341,23 +435,44 @@ class TemplateService:
         if permission not in ["owner", "admin"]:
             return None
 
-        # Check if user exists
-        target_user = db.query(User).filter(User.id == share_data.user_id).first()
-        if not target_user:
-            raise PDFFormFillerError("Target user not found")
+        # Handle user or group sharing
+        if share_data.user_id:
+            # Sharing with user
+            target_user = db.query(User).filter(User.id == share_data.user_id).first()
+            if not target_user:
+                raise PDFFormFillerError("Target user not found")
 
-        # Check if already shared
-        existing_share = db.query(TemplateShare).filter(
-            TemplateShare.template_id == template_id,
-            TemplateShare.user_id == share_data.user_id
-        ).first()
+            # Check if already shared
+            existing_share = db.query(TemplateShare).filter(
+                TemplateShare.template_id == template_id,
+                TemplateShare.user_id == share_data.user_id
+            ).first()
 
-        if existing_share:
-            raise PDFFormFillerError("Template already shared with this user")
+            if existing_share:
+                raise PDFFormFillerError("Template already shared with this user")
 
-        # Cannot share with self
-        if share_data.user_id == template.owner_id:
-            raise PDFFormFillerError("Cannot share template with owner")
+            # Cannot share with self
+            if share_data.user_id == template.owner_id:
+                raise PDFFormFillerError("Cannot share template with owner")
+
+        elif share_data.group_id:
+            # Sharing with group
+            from ..models.group import Group
+            target_group = db.query(Group).filter(Group.id == share_data.group_id).first()
+            if not target_group:
+                raise PDFFormFillerError("Target group not found")
+
+            # Check if already shared
+            existing_share = db.query(TemplateShare).filter(
+                TemplateShare.template_id == template_id,
+                TemplateShare.group_id == share_data.group_id
+            ).first()
+
+            if existing_share:
+                raise PDFFormFillerError("Template already shared with this group")
+
+        else:
+            raise PDFFormFillerError("Either user_id or group_id must be provided")
 
         try:
             # Convert permission string to enum
@@ -368,6 +483,7 @@ class TemplateService:
                 id=str(uuid.uuid4()),
                 template_id=template_id,
                 user_id=share_data.user_id,
+                group_id=share_data.group_id,
                 shared_by_id=current_user_id,
                 permission=permission_enum
             )

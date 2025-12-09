@@ -1,6 +1,7 @@
 """
 Web routes for template management
 """
+import uuid
 from fastapi import APIRouter, Depends, Request, UploadFile, File, Form, HTTPException
 from fastapi.responses import HTMLResponse, RedirectResponse, FileResponse
 from fastapi.templating import Jinja2Templates
@@ -9,6 +10,7 @@ from sqlalchemy.orm import Session
 from ...database import get_db
 from ...dependencies import get_current_user, require_user
 from ...models.user import User
+from ...models.template import Template, TemplateShare, PermissionLevel
 from ...schemas.template import TemplateCreate, TemplateUpdate, TemplateShareCreate
 from ...services.template_service import TemplateService
 from ...services.storage_service import StorageService
@@ -39,6 +41,10 @@ def templates_page(
     owned_templates = TemplateService.get_user_templates(db, current_user.id)
     shared_templates = TemplateService.get_shared_templates(db, current_user.id)
 
+    # Get all groups for the dropdown
+    from ...models.group import Group
+    all_groups = db.query(Group).order_by(Group.name).all()
+
     # Add permission info
     owned_list = []
     for template in owned_templates:
@@ -67,6 +73,7 @@ def templates_page(
         {
             "owned_templates": owned_list,
             "shared_templates": shared_list,
+            "all_groups": all_groups,
             "current_user": current_user
         }
     )
@@ -76,6 +83,7 @@ def templates_page(
 async def create_template(
     name: str = Form(...),
     description: str = Form(None),
+    group_id: str = Form(None),
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -92,7 +100,14 @@ async def create_template(
         )
 
     try:
-        template_data = TemplateCreate(name=name, description=description)
+        # Convert empty string to None for group_id
+        group_id_value = group_id if group_id and group_id.strip() else None
+
+        template_data = TemplateCreate(
+            name=name,
+            description=description,
+            group_id=group_id_value
+        )
         TemplateService.create_template(
             db=db,
             user_id=current_user.id,
@@ -142,16 +157,32 @@ def template_details(
     shares = None
     if permission in ["owner", "admin"]:
         shares = TemplateService.get_template_shares(db, template_id, current_user.id)
-        # Enrich with user info
-        shares_with_users = []
+        # Enrich with user/group info
+        shares_with_info = []
         if shares:
+            from ...models.group import Group
             for share in shares:
-                user = db.query(User).filter(User.id == share.user_id).first()
-                shares_with_users.append({
-                    "share": share,
-                    "user": user
-                })
-        shares = shares_with_users
+                if share.user_id:
+                    user = db.query(User).filter(User.id == share.user_id).first()
+                    shares_with_info.append({
+                        "share": share,
+                        "user": user,
+                        "type": "user"
+                    })
+                elif share.group_id:
+                    group = db.query(Group).filter(Group.id == share.group_id).first()
+                    shares_with_info.append({
+                        "share": share,
+                        "group": group,
+                        "type": "group"
+                    })
+        shares = shares_with_info
+
+    # Get all groups for sharing dropdown (only if owner)
+    all_groups = []
+    if is_owner:
+        from ...models.group import Group
+        all_groups = db.query(Group).order_by(Group.name).all()
 
     return templates.TemplateResponse(
         request,
@@ -163,6 +194,7 @@ def template_details(
             "fields": fields,
             "field_count": len(fields),
             "shares": shares,
+            "all_groups": all_groups,
             "current_user": current_user
         }
     )
@@ -173,6 +205,7 @@ async def update_template(
     template_id: str,
     name: str = Form(...),
     description: str = Form(None),
+    group_id: str = Form(None),
     file: UploadFile = File(None),
     version_type: str = Form("major"),
     version_notes: str = Form(None),
@@ -184,8 +217,15 @@ async def update_template(
         return RedirectResponse(url="/login", status_code=302)
 
     try:
+        # Convert empty string to None for group_id
+        group_id_value = group_id if group_id and group_id.strip() else None
+
         # First update basic metadata
-        template_data = TemplateUpdate(name=name, description=description)
+        template_data = TemplateUpdate(
+            name=name,
+            description=description,
+            group_id=group_id_value
+        )
         template = TemplateService.update_template(
             db=db,
             template_id=template_id,
@@ -356,29 +396,66 @@ async def download_template(
 @router.post("/templates/{template_id}/share")
 async def share_template(
     template_id: str,
-    user_email: str = Form(...),
+    share_type: str = Form(...),
+    user_email: str = Form(None),
+    group_id: str = Form(None),
     permission: str = Form("viewer"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Share template with user"""
+    """Share template with user or group"""
     if not current_user:
         return RedirectResponse(url="/login", status_code=302)
 
-    # Find user by email
-    target_user = db.query(User).filter(User.email == user_email).first()
-
-    if not target_user:
-        return RedirectResponse(
-            url=f"/templates/{template_id}?error=user_not_found",
-            status_code=302
-        )
-
     try:
-        share_data = TemplateShareCreate(
-            user_id=target_user.id,
-            permission=permission
-        )
+        if share_type == "user":
+            if not user_email:
+                return RedirectResponse(
+                    url=f"/templates/{template_id}?error=missing_email",
+                    status_code=302
+                )
+
+            # Find user by email
+            target_user = db.query(User).filter(User.email == user_email).first()
+
+            if not target_user:
+                return RedirectResponse(
+                    url=f"/templates/{template_id}?error=user_not_found",
+                    status_code=302
+                )
+
+            share_data = TemplateShareCreate(
+                user_id=target_user.id,
+                permission=permission
+            )
+
+        elif share_type == "group":
+            if not group_id:
+                return RedirectResponse(
+                    url=f"/templates/{template_id}?error=missing_group",
+                    status_code=302
+                )
+
+            # Verify group exists
+            from ...models.group import Group
+            group = db.query(Group).filter(Group.id == group_id).first()
+
+            if not group:
+                return RedirectResponse(
+                    url=f"/templates/{template_id}?error=group_not_found",
+                    status_code=302
+                )
+
+            share_data = TemplateShareCreate(
+                group_id=group_id,
+                permission=permission
+            )
+
+        else:
+            return RedirectResponse(
+                url=f"/templates/{template_id}?error=invalid_share_type",
+                status_code=302
+            )
 
         TemplateService.share_template(
             db=db,
@@ -433,6 +510,127 @@ async def remove_share(
             url=f"/templates/{template_id}?error=remove_failed",
             status_code=302
         )
+
+
+@router.post("/templates/{template_id}/transfer-ownership")
+async def transfer_ownership(
+    template_id: str,
+    new_owner_username: str = Form(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Transfer template ownership (admin only)"""
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=302)
+
+    try:
+        # Get the template
+        template = db.query(Template).filter(Template.id == template_id).first()
+
+        if not template:
+            return RedirectResponse(
+                url="/templates?error=not_found",
+                status_code=302
+            )
+
+        # Check if user has admin permission
+        permission = template.get_permission_for_user(current_user.id)
+        if permission not in ["owner", "admin"]:
+            return RedirectResponse(
+                url=f"/templates/{template_id}?error=no_permission",
+                status_code=302
+            )
+
+        # Find the new owner by username
+        new_owner = db.query(User).filter(User.username == new_owner_username).first()
+
+        if not new_owner:
+            return RedirectResponse(
+                url=f"/templates/{template_id}?error=user_not_found",
+                status_code=302
+            )
+
+        # Cannot transfer to self
+        if new_owner.id == template.owner_id:
+            return RedirectResponse(
+                url=f"/templates/{template_id}?error=already_owner",
+                status_code=302
+            )
+
+        # Transfer ownership
+        old_owner_id = template.owner_id
+        template.owner_id = new_owner.id
+
+        # Remove any existing share with the new owner (they're now the owner)
+        existing_new_owner_share = db.query(TemplateShare).filter(
+            TemplateShare.template_id == template_id,
+            TemplateShare.user_id == new_owner.id
+        ).first()
+        if existing_new_owner_share:
+            db.delete(existing_new_owner_share)
+
+        # Remove any existing share with the old owner
+        existing_old_owner_share = db.query(TemplateShare).filter(
+            TemplateShare.template_id == template_id,
+            TemplateShare.user_id == old_owner_id
+        ).first()
+        if existing_old_owner_share:
+            db.delete(existing_old_owner_share)
+
+        # Create a share for the old owner with admin permission
+        # So they don't lose access completely
+        old_owner_share = TemplateShare(
+            id=str(uuid.uuid4()),
+            template_id=template_id,
+            user_id=old_owner_id,
+            shared_by_id=current_user.id,
+            permission=PermissionLevel.ADMIN
+        )
+        db.add(old_owner_share)
+
+        db.commit()
+
+        return RedirectResponse(
+            url=f"/templates/{template_id}?success=ownership_transferred",
+            status_code=302
+        )
+
+    except Exception as e:
+        db.rollback()
+        import traceback
+        print(f"ERROR transferring ownership: {str(e)}")
+        print(traceback.format_exc())
+        return RedirectResponse(
+            url=f"/templates/{template_id}?error=transfer_failed",
+            status_code=302
+        )
+
+
+@router.get("/api/users/search")
+async def search_users(
+    q: str = "",
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Search users by username (for autocomplete)"""
+    if not current_user:
+        return {"users": []}
+
+    # Search users by username (case insensitive, limit to 10 results)
+    users = db.query(User).filter(
+        User.username.ilike(f"%{q}%")
+    ).limit(10).all()
+
+    return {
+        "users": [
+            {
+                "username": user.username,
+                "full_name": user.full_name,
+                "email": user.email
+            }
+            for user in users
+        ]
+    }
 
 
 @router.get("/templates/{template_id}/download-excel")
@@ -572,6 +770,116 @@ async def save_default_values(
         db.rollback()
         return RedirectResponse(
             url=f"/templates/{template_id}?error=save_failed",
+            status_code=302
+        )
+
+
+@router.post("/templates/{template_id}/configure-field")
+async def configure_single_field(
+    template_id: str,
+    field_name: str = Form(...),
+    field_type: str = Form("text"),
+    default_value: str = Form(None),
+    is_dynamic: str = Form(None),
+    dynamic_type: str = Form(None),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Configure a single field's properties"""
+    from sqlalchemy.orm.attributes import flag_modified
+
+    if not current_user:
+        return RedirectResponse(url="/login", status_code=302)
+
+    # Check template access and permission
+    template = TemplateService.get_template(db, template_id, current_user.id)
+
+    if not template:
+        return RedirectResponse(
+            url=f"/templates?error=not_found",
+            status_code=302
+        )
+
+    # Check permission (owner, admin or editor can modify)
+    permission = template.get_permission_for_user(current_user.id)
+    if permission not in ["owner", "admin", "editor"]:
+        return RedirectResponse(
+            url=f"/templates/{template_id}?error=no_permission",
+            status_code=302
+        )
+
+    try:
+        print(f"[DEBUG] Configuring field '{field_name}'")
+        print(f"[DEBUG] field_type: {field_type}, is_dynamic: {is_dynamic}, dynamic_type: {dynamic_type}, default_value: {default_value}")
+
+        # Get current values - make copies to work with
+        default_values = dict(template.default_values) if template.default_values else {}
+        field_config = dict(template.field_config) if template.field_config else {}
+
+        print(f"[DEBUG] Before - default_values: {default_values}")
+        print(f"[DEBUG] Before - field_config: {field_config}")
+
+        # Initialize field config if needed
+        if field_name not in field_config:
+            field_config[field_name] = {}
+
+        # Update field type
+        if field_type and field_type != "text":
+            field_config[field_name]["field_type"] = field_type
+        elif "field_type" in field_config[field_name]:
+            del field_config[field_name]["field_type"]
+
+        # Handle dynamic vs static value
+        if is_dynamic == "on" and dynamic_type:
+            # Dynamic value
+            field_config[field_name]["dynamic_type"] = dynamic_type
+            # Remove static default if exists
+            if field_name in default_values:
+                del default_values[field_name]
+        else:
+            # Static value
+            if "dynamic_type" in field_config[field_name]:
+                del field_config[field_name]["dynamic_type"]
+
+            # Set default value
+            if default_value and default_value.strip():
+                default_values[field_name] = default_value
+            elif field_name in default_values:
+                del default_values[field_name]
+
+        # Clean up empty field config
+        if not field_config[field_name]:
+            del field_config[field_name]
+
+        print(f"[DEBUG] After - default_values: {default_values}")
+        print(f"[DEBUG] After - field_config: {field_config}")
+
+        # Update template - force SQLAlchemy to detect changes
+        template.default_values = default_values if default_values else None
+        template.field_config = field_config if field_config else None
+
+        # Flag as modified to ensure SQLAlchemy detects the change
+        flag_modified(template, "default_values")
+        flag_modified(template, "field_config")
+
+        db.commit()
+        db.refresh(template)
+
+        print(f"[DEBUG] Committed - template.default_values: {template.default_values}")
+        print(f"[DEBUG] Committed - template.field_config: {template.field_config}")
+
+        return RedirectResponse(
+            url=f"/templates/{template_id}?success=field_configured",
+            status_code=302
+        )
+
+    except Exception as e:
+        print(f"[ERROR] Failed to configure field: {e}")
+        import traceback
+        traceback.print_exc()
+        db.rollback()
+        return RedirectResponse(
+            url=f"/templates/{template_id}?error=config_failed",
             status_code=302
         )
 

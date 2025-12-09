@@ -25,6 +25,7 @@ class Template(Base):
     name = Column(String(255), nullable=False)
     description = Column(Text, nullable=True)
     owner_id = Column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    group_id = Column(String, ForeignKey("groups.id", ondelete="SET NULL"), nullable=True)
     file_path = Column(String(512), nullable=False)
     original_filename = Column(String(255), nullable=False)
 
@@ -51,6 +52,7 @@ class Template(Base):
 
     # Relationships
     owner = relationship("User", back_populates="templates")
+    group = relationship("Group", backref="templates")
     shares = relationship("TemplateShare", back_populates="template", cascade="all, delete-orphan")
 
     def __repr__(self):
@@ -62,14 +64,26 @@ class Template(Base):
         return f"{self.version_major}.{self.version_minor}"
 
     def is_accessible_by(self, user_id: str) -> bool:
-        """Check if user has access to this template"""
+        """Check if user has access to this template (directly or via groups)"""
         if self.owner_id == user_id:
             return True
 
-        # Check if shared with user
+        # Check if shared directly with user
         for share in self.shares:
             if share.user_id == user_id:
                 return True
+
+        # Check if shared with user's groups
+        from .group import GroupMember
+        for share in self.shares:
+            if share.group_id:
+                # Check if user is a member of this group
+                for member in share.group.members:
+                    if member.user_id == user_id:
+                        return True
+                # Also check if user is the group owner
+                if share.group.owner_id == user_id:
+                    return True
 
         return False
 

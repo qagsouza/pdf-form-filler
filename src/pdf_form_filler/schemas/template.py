@@ -11,6 +11,7 @@ class TemplateBase(BaseModel):
     """Base template schema"""
     name: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = Field(None, max_length=2000)
+    group_id: Optional[str] = Field(None, description="ID of the group this template belongs to")
 
     @field_validator('name')
     @classmethod
@@ -31,6 +32,7 @@ class TemplateUpdate(BaseModel):
     """Schema for updating a template"""
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     description: Optional[str] = Field(None, max_length=2000)
+    group_id: Optional[str] = Field(None, description="ID of the group this template belongs to")
 
     @field_validator('name')
     @classmethod
@@ -54,6 +56,7 @@ class TemplateInDB(TemplateBase):
     """Template schema with all database fields"""
     id: str
     owner_id: str
+    group_id: Optional[str] = None
     file_path: str
     original_filename: str
     fields_metadata: Optional[Dict[str, Dict[str, Any]]] = None
@@ -76,6 +79,7 @@ class TemplateListResponse(BaseModel):
     name: str
     description: Optional[str]
     owner_id: str
+    group_id: Optional[str] = None
     original_filename: str
     version: int
     created_at: datetime
@@ -97,8 +101,9 @@ class TemplateFieldsResponse(BaseModel):
 # Template Sharing Schemas
 
 class TemplateShareCreate(BaseModel):
-    """Schema for sharing a template"""
-    user_id: str = Field(..., description="ID of the user to share with")
+    """Schema for sharing a template with user or group"""
+    user_id: Optional[str] = Field(None, description="ID of the user to share with")
+    group_id: Optional[str] = Field(None, description="ID of the group to share with")
     permission: str = Field("viewer", description="Permission level: viewer, editor, admin")
 
     @field_validator('permission')
